@@ -1,7 +1,7 @@
 module Rob
     #(
-    parameter REG_ADDR_WIDTH = 5;
-    parameter Q_WIDTH        = 5;
+    parameter REG_ADDR_WIDTH = 5,
+    parameter Q_WIDTH        = 5
     )
     (
     input   wire          clk_in,
@@ -29,7 +29,7 @@ module Rob
     output  wire  [31:0]          Commit_V,
     
     output wire   [Q_WIDTH-1:0]   ROB_tail
-    )
+    );
     
     
 endmodule
