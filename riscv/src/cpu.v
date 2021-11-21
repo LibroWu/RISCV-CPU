@@ -1,15 +1,22 @@
 // RISCV32I CPU top module
 // port modification allowed for debugging purposes
 
+`include "IF.v"
+`include "issue.v"
+`include "ex.v"
+`include "regfile.v"
+`include "Rob.v"
+`include "Rs.v"
+`include "SLBuffer.v"
 module cpu(input wire clk_in,
            input wire rst_in,
-           input wire					 rdy_in,
-           input wire [7:0] mem_din,
+           input wire rdy_in,
+           input wire  [7:0]  mem_din,
            output wire [7:0] mem_dout,
-           output wire [31:0] mem_a,
-           output wire mem_wr,
-           input wire io_buffer_full,         // 1 if uart buffer is full
-           output wire [31:0]			dbgreg_dout);
+           output wire [31:0]   mem_a,
+           output wire         mem_wr,
+           input wire  io_buffer_full,         // 1 if uart buffer is full
+           output wire [31:0] dbgreg_dout);
     
     // implementation goes here
     
@@ -22,66 +29,195 @@ module cpu(input wire clk_in,
     // - 0x30000 write: write a byte to output (write 0x00 is ignored)
     // - 0x30004 read: read clocks passed since cpu starts (in dword, 4 bytes)
     // - 0x30004 write: indicates program stop (will output '\0' through uart tx)
-    parameter Q_WIDTH = 5,
+    parameter Q_WIDTH = 4;
+    parameter RS_WIDTH = 4;
+    parameter SLB_WIDTH = 4;
     parameter REG_ADDR_WIDTH = 5;
-    
-    wire IF_access_request,IF_access_valid,IF_has_instr;
-    wire [31:0] IF_instr,IF_mem_addr,
+    wire IF_access_request,IF_access_valid,IF_has_instr,IF_rd_en;
+    wire [7:0] IF_mem_din;
+    wire [31:0] IF_instr,IF_mem_addr,IF_npc;
+    assign IF_rd_en = !rob_isFull;
     IF _if( .clk_in(clk_in),
             .rst_in(rst_in),
             .rdy_in(rdy_in),
-            .access_control(IF_access_request),
+            .rd_en(IF_rd_en),
             .access_valid(IF_access_valid),
+            .mem_din(IF_mem_din),
             .mem_addr(IF_mem_addr),
-            .mem_din(mem_din),
+            .access_control(IF_access_request),
             .has_instr(IF_has_instr),
-            .instr(IF_instr));
-
-    wire issue_has_result,issue_toSLB,issue_toRS;
-    wire [31:0] issue_output_V1,issue_output_V2,issue_output_Q1,issue_output_Q2,issue_immediate;
-    wire [31:0] issue_input_V1,issue_input_V2,issue_input_Q1,issue_input_Q2;
-    wire [REG_ADDR_WIDTH-1:0] rs1,rs2,rd;
-    Issue _issue( 
-                  .clk_in(clk_in),
-                  .rst_in(rst_in),
-                  .rdy_in(rdy_in),
-                  .instr(IF_instr),
+            .instr(IF_instr),
+            .npc(IF_npc)
+            );
+    wire [4:0] issue_rs1,issue_rs2,issue_rd;
+    wire issue_toRS,issue_toSLB;
+    wire [9:0] issue_op;
+    wire [31:0] issue_immediate,issue_npc;
+    Issue _issue( .instr(IF_instr),
+                  .npc_input(IF_npc),
                   .has_instr(IF_has_instr),
-                   .V1(issue_input_V1),
-                  .V2(issue_input_V2),
-                  .Q1(issue_input_Q1),
-                  .Q2(issue_input_Q2),
-                  .rs1(rs1),
-                  .rs2(rs2),
+                  .rs1(issue_rs1),
+                  .rs2(issue_rs2),
+                  .rd(issue_rd),
                   .toSLB(issue_toSLB),
                   .toRS(issue_toRS),
-                  .hasResult(issue_has_result),
-                  //todo output
+                  .npc(issue_npc)
                 );
-
-    regfile _regfile(
-                  .clk_in(clk_in),
-                  .rst_in(rst_in),
-                  .rdy_in(rdy_in),
-
-                  .rs1(rs1),
-                  .rs2(rs2),
-
-                  //todo rd
-
-                  );
-
-    EX _ex(
-
+    wire regfile_rd_control;
+    assign regfile_rd_control = !(issue_op[9:7]==3 || issue_op[9:7]==4);
+    wire [31:0] regfile_V1,regfile_V2,V1,V2,ex_V1,ex_V2,ex_immediate,ex_npc,ex_V,ex_tpc;
+    wire [Q_WIDTH-1:0] regfile_Q1,regfile_Q2,Q1,Q2;
+    wire [9:0]  ex_op;
+    assign V1 = (regfile_Q1==0)  ? regfile_V1 :
+                (rob_has_value1) ? rob_V1     :
+                0;
+    assign V2 = (regfile_Q2==0)  ? regfile_V2 :
+                (rob_has_value2) ? rob_V2     :
+                0;
+    assign Q1 = (issue_op[9:7]==5 || issue_op[9:7]==6 || (regfile_Q1==0 || rob_has_value1))? 0 : regfile_Q1;
+    assign Q2 = (issue_op[9:7]==5 || issue_op[9:7]==6 || issue_op[9:7]==2 ||(regfile_Q2==0 || rob_has_value2))? 0 : regfile_Q2;
+    regfile _regfile( .clk_in(clk_in),
+                      .rst_in(rst_in),
+                      .rdy_in(rdy_in),
+                      .rs1(issue_rs1),
+                      .rs2(issue_rs2),
+                      .rd_control(regfile_rd_control),
+                      .rd(issue_rd),
+                      .Q_value(ROB_tail),
+                      .has_commit(commit_modify_regfile),
+                      .commit_target(commit_reg_addr),
+                      .Commit_Q(Commit_Q),
+                      .Commit_V(Commit_V),
+                      .V1(regfile_V1),
+                      .V2(regfile_V2),
+                      .Q1(regfile_Q1),
+                      .Q2(regfile_Q2)
+    );
+    wire rs_input_valid,RS_full,has_ex_node,ex_has_result;
+    wire [31:0] rs_V1,rs_V2,rs_immediate,rs_npc;
+    wire [Q_WIDTH-1:0] ex_ROB_pos,rs_rob_tag;
+    wire [9:0] rs_op;
+    Rs _rs( .clk_in(clk_in),
+            .rst_in(rst_in),
+            .rdy_in(rdy_in),
+            .input_valid(rs_input_valid),
+            .rob_tag_input(ROB_tail),
+            .op_input(issue_op),
+            .Q1_input(Q1),
+            .Q2_input(Q2),
+            .V1_input(V1),
+            .V2_input(V2),
+            .npc_input(issue_npc),
+            .immediate_input(issue_immediate),
+            .update_control(ex_has_result),
+            .target_ROB_pos(ex_ROB_pos),
+            .V_ex(ex_V),
+            .has_slb_result(slb_has_result),
+            .slb_target_ROB_pos(slb_target_ROB_pos),
+            .V_slb(slb_V),
+            .has_ex_node(has_ex_node),
+            .op_output(rs_op),
+            .V1_output(rs_V1),
+            .V2_output(rs_V2),
+            .immediate_output(rs_immediate),
+            .rob_tag_output(rs_rob_tag),
+            .npc_output(rs_npc),
+            .RS_Full(RS_full)
+    );
+    assign rs_input_valid = (!IF_has_instr || (!has_ex_node && Q1==0 && Q2==0))? 0:1;
+    assign ex_has_result = (has_ex_node || (IF_has_instr && issue_toRS && (Q1==0 && Q2==0)));
+    assign ex_op = (has_ex_node)? rs_op : issue_op;
+    assign ex_npc = (has_ex_node)? rs_npc : issue_npc;
+    assign ex_V1 = (has_ex_node)? rs_V1 : V1;
+    assign ex_V2 = (has_ex_node)? rs_V2 : V2;
+    assign ex_immediate = (has_ex_node)? rs_immediate : issue_immediate;
+    assign ex_ROB_pos = (has_ex_node) ? rs_rob_tag : ROB_tail;  
+    EX _ex( .op(ex_op),
+            .V1(ex_V1),
+            .V2(ex_V2),
+            .immediate(ex_immediate),
+            .npc(ex_npc),
+            .V(ex_V),
+            .true_pc(ex_tpc)
+    );
+    wire rob_isFull,rob_isEmpty,commit_modify_regfile,has_commit,rob_has_value1,rob_has_value2;
+    wire [Q_WIDTH-1:0] ROB_tail,Commit_Q;
+    wire [REG_ADDR_WIDTH-1:0] commit_reg_addr;
+    wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
+    Rob  _rob( .clk_in(clk_in),
+               .rst_in(rst_in),
+               .rdy_in(rdy_in),
+               .has_issue(issue_hasResult),
+               .isStore_input(issue_op[9:7]==3),
+               .isBranch_input(issue_op[9:7]==4),
+               .reg_addr(issue_rd),
+               .pre_pc(),
+               .predict_pc(),
+               .has_slb_result(slb_has_result),
+               .slb_target_ROB_pos(slb_target_ROB_pos),
+               .V_slb(slb_V),
+               .has_ex_result(ex_has_result),
+               .target_ROB_pos(ex_ROB_pos),
+               .V_ex(ex_V),
+               .pc_ex(ex_tpc),
+               .rob_pos_r1(regfile_Q1),
+               .rob_pos_r2(regfile_Q2),
+               .has_value1(rob_has_value1),
+               .has_value2(rob_has_value2),
+               .V1(rob_V1),
+               .V2(rob_V2),
+               .has_commit(has_commit),
+               .commit_modify_regfile(commit_modify_regfile),
+               .commit_reg_addr(commit_reg_addr),
+               .Commit_Q(Commit_Q),
+               .Commit_V(Commit_V),
+               .Commit_pc(Commit_pc),
+               .empty(rob_isEmpty),
+               .full(rob_isFull),
+               .ROB_tail(ROB_tail)
+    );
+    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr;
+    wire [Q_WIDTH-1:0] slb_target_ROB_pos;
+    wire [31:0] slb_V,slb_mem_addr;
+    wire [7:0] slb_mem_din,slb_mem_dout;
+    SLBuffer _slbuffer( .clk_in(clk_in),
+                        .rst_in(rst_in),
+                        .rdy_in(rdy_in),
+                        .input_valid(issue_toSLB),
+                        .rob_id(ROB_tail),
+                        .immediate_input(issue_immediate),
+                        .op_input(issue_op),
+                        .Q1_input(Q1),
+                        .Q2_input(Q2),
+                        .V1_input(V1),
+                        .V2_input(V2),
+                        .update_control(ex_has_result),
+                        .target_ROB_pos(ex_ROB_pos),
+                        .V_ex(ex_V),
+                        .has_commit(has_commit),
+                        .Commit_Q(Commit_Q),
+                        .Commit_V(Commit_V),
+                        .access_valid(slb_access_valid),
+                        .mem_din(slb_mem_din),
+                        .mem_dout(slb_mem_dout),
+                        .mem_addr(slb_mem_addr),
+                        .access_control(slb_access_request),
+                        .mem_wr(slb_mem_wr),
+                        .has_result(slb_has_result),
+                        .slb_target_ROB_pos(slb_target_ROB_pos),
+                        .V(slb_V)
     );
 
-    Rob  _rob(
-
-    );
-
-    SLBuffer _slbuffer(
-        
-    );
+    //mem access control
+    assign IF_access_valid = IF_access_request && !slb_access_request;
+    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full);
+    assign mem_wr = (!IF_access_valid || slb_access_valid && slb_mem_wr);
+    assign mem_addr = (IF_access_valid) ? IF_mem_addr:
+                      (slb_access_valid) ? slb_mem_addr:
+                      0;
+    assign mem_dout = slb_mem_dout;
+    assign slb_mem_din = mem_din;
+    assign IF_mem_din = mem_din;
 
     always @(posedge clk_in)
     begin

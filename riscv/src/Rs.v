@@ -18,23 +18,34 @@ endmodule
         input   wire          rdy_in,
         
         //input from issue
-        //more inputs
         input   wire             input_valid,
+        input   wire [Q_WIDTH-1:0]  rob_tag_input,
+        input   wire [9:0]          op_input,
         input   wire [Q_WIDTH-1:0]  Q1_input,
         input   wire [Q_WIDTH-1:0]  Q2_input,
         input   wire [31:0]         V1_input,
         input   wire [31:0]         V2_input,
-        //opcode
+        input   wire [31:0]         immediate_input,
+        input   wire [31:0]         npc_input,
         
         //input from ex result
         input wire update_control,//1 if have ex result
         input wire [Q_WIDTH-1:0] target_ROB_pos,
         input wire [31:0]        V_ex,
+
+        //input from SLBuffer result
+        input wire has_slb_result,
+        input wire [Q_WIDTH-1:0] slb_target_ROB_pos,
+        input wire [31:0] V_slb,
         
+        //output
         output  wire has_ex_node,
+        output  wire [9:0]     op_output,
         output  wire [31:0]    V1_output,
         output  wire [31:0]    V2_output,
-        //opcode
+        output  wire [31:0]   npc_output,
+        output  wire [31:0]    immediate_output,
+        output  wire [Q_WIDTH-1:0] rob_tag_output,
         output  wire RS_Full
         );
         
@@ -42,10 +53,12 @@ endmodule
         wire [RS_WIDTH-1:0] empty_pos,exable_pos;
         wire [2**RS_WIDTH-1:0] exable;
         wire _has_ex_node;
-        reg [7:0] op [2**RS_WIDTH-1:0];
-        reg [Q_WIDTH-1:0] Q1[2**RS_WIDTH-1:0],Q2[2**RS_WIDTH-1:0],id[2**RS_WIDTH-1:0];
-        reg [31:0] V1[2**RS_WIDTH-1:0],V2[2**RS_WIDTH-1:0];
-        reg [31:0] _V1_output,_V2_output;
+        reg [9:0] op [2**RS_WIDTH-1:0];
+        reg [Q_WIDTH-1:0] Q1[2**RS_WIDTH-1:0],Q2[2**RS_WIDTH-1:0],rob_tag[2**RS_WIDTH-1:0];
+        reg [31:0] V1[2**RS_WIDTH-1:0],V2[2**RS_WIDTH-1:0],immediate[2**RS_WIDTH-1:0],npc[2**RS_WIDTH-1:0];
+        reg [31:0] _V1_output,_V2_output,_immediate_output,_npc_output;
+        reg [9:0] _op_output;
+        reg [Q_WIDTH-1:0] _rob_tag_output;
         integer j;
         always @(posedge clk_in) begin
             if (rst_in) begin
@@ -55,6 +68,8 @@ endmodule
                     Q2[j] <= 0;
                     V1[j] <= 32'b0;
                     V2[j] <= 32'b0;
+                    immediate[j] <= 32'b0;
+                    npc[j] <= 32'b0;
                 end
             end
                 else if (!rdy_in) begin
@@ -62,10 +77,14 @@ endmodule
                 end else begin
                     if (input_valid) begin
                         Busy[empty_pos] <= 1;
+                        rob_tag[empty_pos] <= rob_tag_input;
+                        op[empty_pos] <= op_input;
                         Q1[empty_pos] <= Q1_input;
                         Q2[empty_pos] <= Q2_input;
                         V1[empty_pos] <= V1_input;
                         V2[empty_pos] <= V2_input;
+                        immediate[empty_pos] <= immediate_input;
+                        npc[empty_pos] <= npc_input;
                         if (update_control) begin
                             if (Q1_input == target_ROB_pos) begin
                                 Q1[empty_pos] <= 0;
@@ -74,6 +93,16 @@ endmodule
                             if (Q2_input == target_ROB_pos) begin
                                 Q2[empty_pos] <= 0;
                                 V2[empty_pos] <= V_ex;
+                            end
+                        end
+                        if (has_slb_result) begin
+                            if (Q1_input == slb_target_ROB_pos) begin
+                                Q1[empty_pos] <= 0;
+                                V1[empty_pos] <= V_slb;
+                            end
+                            if (Q2_input == slb_target_ROB_pos) begin
+                                Q2[empty_pos] <= 0;
+                                V2[empty_pos] <= V_slb;
                             end
                         end
                     end
@@ -90,8 +119,12 @@ endmodule
                         end
                     end
                     if (_has_ex_node) begin
+                        _op_output <= op[exable];
                         _V1_output <= V1[exable_pos];
                         _V2_output <= V2[exable_pos];
+                        _npc_output <= npc[exable_pos];
+                        _immediate_output <= immediate[exable_pos];
+                        _rob_tag_output <= rob_tag[exable_pos];
                         Busy[exable_pos] = 0;
                     end
                 end
@@ -137,11 +170,14 @@ endmodule
         assign has_ex_node = _has_ex_node;
         assign V1_output = _V1_output;
         assign V2_output = _V2_output;
+        assign op_output = _op_output;
+        assign immediate_output = _immediate_output;
+        assign npc_output       = _npc_output;
+        assign rob_tag_output   = _rob_tag_output;
         genvar i;
         generate 
         for (i = 0;i<2**RS_WIDTH;i = i+1) begin
             excutable_checker #(.Q_WIDTH(Q_WIDTH)) excuter  (.Q1(Q1[i]),.Q2(Q2[i]),.busy(Busy[i]),.exable(exable[i]));
         end
         endgenerate
-
     endmodule

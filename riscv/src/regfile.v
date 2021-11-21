@@ -25,12 +25,11 @@ module regfile
     output wire  [31:0]          V2,     // data output
     output wire  [Q_WIDTH-1:0]   Q1,
     output wire  [Q_WIDTH-1:0]   Q2
-    )
+    );
     
     reg [31:0] regs[REG_ADDR_WIDTH-1:0];
     reg [Q_WIDTH-1:0] Q[REG_ADDR_WIDTH-1:0];
-    reg [31:0] _V1,_V2;
-    reg [Q_WIDTH-1:0] _Q1,_Q2;
+    integer i;
     always @(posedge clk_in) begin
         if (rst_in)
         begin
@@ -45,22 +44,10 @@ module regfile
         end
         else
         begin
-            _V1 <= regs[rs1];
-            _V2 <= regs[rs2];
-            _Q1 <= Q[rs1];
-            _Q2 <= Q[rs2];
             if (has_commit) begin
-                regs[commit_target] <= commit_V;
+                regs[commit_target] <= Commit_V;
                 if (Q[commit_target]==Commit_Q) begin
                     Q[commit_target] <= 0;
-                end
-                if (commit_target==rs1) begin
-                    _Q1 <= 0;
-                    _V1 <= commit_V;
-                end
-                if (commit_target==rs2) begin
-                    _Q2 <= 0;
-                    _V2 <= commit_V;
                 end
             end
             if (rd_control) begin
@@ -68,8 +55,12 @@ module regfile
             end
         end
     end
-    assign Q1 = _Q1;
-    assign Q2 = _Q2;
-    assign V1 = _V1;
-    assign V2 = _V2;
+    assign Q1 = Q[rs1];
+    assign Q2 = Q[rs2];
+    assign V1 = regs[rs1];
+    assign V2 = regs[rs2];
+    always @(regs[0] | Q[0]) begin
+        regs[0] <= 0;
+        Q[0] <= 0;
+    end
 endmodule
