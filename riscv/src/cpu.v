@@ -33,6 +33,17 @@ module cpu(input wire clk_in,
     parameter RS_WIDTH = 4;
     parameter SLB_WIDTH = 4;
     parameter REG_ADDR_WIDTH = 5;
+    //rob
+    wire rob_isFull,rob_isEmpty,commit_modify_regfile,has_commit,rob_has_value1,rob_has_value2;
+    wire [Q_WIDTH-1:0] ROB_tail,Commit_Q;
+    wire [REG_ADDR_WIDTH-1:0] commit_reg_addr;
+    wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
+    //slb
+    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr;
+    wire [Q_WIDTH-1:0] slb_target_ROB_pos;
+    wire [31:0] slb_V,slb_mem_addr;
+    wire [7:0] slb_mem_din,slb_mem_dout;
+    //IF
     wire IF_access_request,IF_access_valid,IF_has_instr,IF_rd_en;
     wire [7:0] IF_mem_din;
     wire [31:0] IF_instr,IF_mem_addr,IF_npc;
@@ -76,7 +87,7 @@ module cpu(input wire clk_in,
                 0;
     assign Q1 = (issue_op[9:7]==5 || issue_op[9:7]==6 || (regfile_Q1==0 || rob_has_value1))? 0 : regfile_Q1;
     assign Q2 = (issue_op[9:7]==5 || issue_op[9:7]==6 || issue_op[9:7]==2 ||(regfile_Q2==0 || rob_has_value2))? 0 : regfile_Q2;
-    regfile _regfile( .clk_in(clk_in),
+    regfile  _regfile( .clk_in(clk_in),
                       .rst_in(rst_in),
                       .rdy_in(rdy_in),
                       .rs1(issue_rs1),
@@ -140,10 +151,6 @@ module cpu(input wire clk_in,
             .V(ex_V),
             .true_pc(ex_tpc)
     );
-    wire rob_isFull,rob_isEmpty,commit_modify_regfile,has_commit,rob_has_value1,rob_has_value2;
-    wire [Q_WIDTH-1:0] ROB_tail,Commit_Q;
-    wire [REG_ADDR_WIDTH-1:0] commit_reg_addr;
-    wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
     Rob  _rob( .clk_in(clk_in),
                .rst_in(rst_in),
                .rdy_in(rdy_in),
@@ -176,10 +183,6 @@ module cpu(input wire clk_in,
                .full(rob_isFull),
                .ROB_tail(ROB_tail)
     );
-    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr;
-    wire [Q_WIDTH-1:0] slb_target_ROB_pos;
-    wire [31:0] slb_V,slb_mem_addr;
-    wire [7:0] slb_mem_din,slb_mem_dout;
     SLBuffer _slbuffer( .clk_in(clk_in),
                         .rst_in(rst_in),
                         .rdy_in(rdy_in),
@@ -209,7 +212,7 @@ module cpu(input wire clk_in,
     );
 
     //mem access control
-    assign IF_access_valid = IF_access_request && !slb_access_request;
+    assign IF_access_valid = IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
     assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full);
     assign mem_wr = (!IF_access_valid || slb_access_valid && slb_mem_wr);
     assign mem_addr = (IF_access_valid) ? IF_mem_addr:

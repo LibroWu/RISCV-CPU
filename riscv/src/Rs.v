@@ -9,7 +9,7 @@ endmodule
     module Rs
         #(
         parameter REG_ADDR_WIDTH = 5,
-        parameter Q_WIDTH        = 5,
+        parameter Q_WIDTH        = 4,
         parameter RS_WIDTH       = 4
         )
         (

@@ -1,7 +1,7 @@
 module regfile
     #(
     parameter REG_ADDR_WIDTH = 5,
-    parameter Q_WIDTH = 5
+    parameter Q_WIDTH = 4
     )
     (
     input  wire           clk_in,   // system clock

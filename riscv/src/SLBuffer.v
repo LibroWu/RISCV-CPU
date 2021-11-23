@@ -1,4 +1,4 @@
-module excutable_checker #(parameter Q_WIDTH = 5)
+module excutable_checker_slb #(parameter Q_WIDTH = 5)
                           (input wire [Q_WIDTH-1:0] Q1,
                            input wire [Q_WIDTH-1:0] Q2,
                            input wire isStore,
@@ -231,7 +231,7 @@ module SLBuffer
     genvar i;
     generate 
     for (i = 0;i<2**SLB_WIDTH;i = i+1) begin
-        excutable_checker #(.Q_WIDTH(Q_WIDTH)) excuter  (.Q1(Q1[i]),.Q2(Q2[i]),.isStore(isStore[i]),.has_commit(receive_commit[i]),.exable(exable[i]));
+        excutable_checker_slb #(.Q_WIDTH(Q_WIDTH)) excuter  (.Q1(Q1[i]),.Q2(Q2[i]),.isStore(isStore[i]),.has_commit(receive_commit[i]),.exable(exable[i]));
     end
     endgenerate
 endmodule
