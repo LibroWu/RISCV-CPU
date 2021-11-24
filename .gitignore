@@ -1,0 +1,4 @@
+test
+*.vcd
+bench
+test*

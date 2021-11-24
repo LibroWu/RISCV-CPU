@@ -27,8 +27,8 @@ module regfile
     output wire  [Q_WIDTH-1:0]   Q2
     );
     
-    reg [31:0] regs[REG_ADDR_WIDTH-1:0];
-    reg [Q_WIDTH-1:0] Q[REG_ADDR_WIDTH-1:0];
+    reg [31:0] regs[2**REG_ADDR_WIDTH-1:0];
+    reg [Q_WIDTH-1:0] Q[2**REG_ADDR_WIDTH-1:0];
     integer i;
     always @(posedge clk_in) begin
         if (rst_in)

@@ -115,7 +115,7 @@ module Rob
     wire [Q_WIDTH-1:0] addr_bits_wide_1;
     assign addr_bits_wide_1 = 1;
     wire [Q_WIDTH-1:0] addr_bits_wide_2;
-    assign addr_bits_wide_1 = 2;
+    assign addr_bits_wide_2 = 2;
 
     // Detect empty state:
     //   1) We were empty before and there was no write.

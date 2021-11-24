@@ -31,24 +31,34 @@ module IF(
     wire [31:0] _instr;
     reg [31:0] _pc;
     reg [1:0] counter;
-    reg _access_valid;
+    reg _access_valid,_wr_en_prot;
     wire rd_en_prot;
     wire wr_en_prot;
-
+    integer j;
     always @(posedge clk_in) begin
         if (rst_in) begin
             _access_valid <= 0;
             pc<=0;
+            _wr_en_prot <= 0;
             counter<=0;
             instr_tmp<=0;
             q_rd_ptr <= 1;
             q_wr_ptr <= 1;
             q_empty  <= 1'b1;
             q_full   <= 1'b0;
+            for (j = 0; j<16; j=j+1) begin
+                instr_queue[j] <= 0;
+                pc_que[j] <= 0;
+            end
         end
         else if (!rdy_in) begin
             
         end else begin
+            _wr_en_prot <= 0;
+            q_full   <= d_full;
+            q_empty  <= d_empty;
+            q_wr_ptr <= d_wr_ptr;
+            q_rd_ptr <= d_rd_ptr;
             instr_queue[q_wr_ptr] <= _instr;
             pc_que[q_wr_ptr] <= _pc;
             _access_valid <= access_valid;
@@ -59,10 +69,19 @@ module IF(
                 end
             end
             if (_access_valid) begin
+                case (counter)
+                    0: instr_tmp[7:0] = mem_din;
+                    1: instr_tmp[15:8] = mem_din;
+                    2: instr_tmp[23:16] = mem_din;
+                    3: instr_tmp[31:24] = mem_din;
+                endcase
+                // if (counter==0) begin
+                //     instr_tmp <= {24'b0,mem_din};
+                // end else begin
+                //   instr_tmp <= instr_tmp<<8 | {24'b0,mem_din};
+                // end
                 if (counter==3) begin
-                    instr_tmp <= {24'b0,mem_din};
-                end else begin
-                  instr_tmp = instr_tmp<<8 | {24'b0,mem_din};
+                    _wr_en_prot<=1;
                 end
                 counter <= counter+1;
             end
@@ -71,7 +90,7 @@ module IF(
 
     // Derive "protected" read/write signals.
     assign rd_en_prot = (rd_en && !q_empty);
-    assign wr_en_prot = (counter==3 && !q_full);
+    assign wr_en_prot = (_wr_en_prot && !q_full);
 
     // Handle writes.
     assign d_wr_ptr = (wr_en_prot)  ? q_wr_ptr + 1'h1 : q_wr_ptr;

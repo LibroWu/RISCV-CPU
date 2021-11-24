@@ -104,6 +104,14 @@ module SLBuffer
             V_tmp         <= 0;
             counter       <= 0;
             _counter      <= 0;
+            isStore       <= 0;
+            receive_commit    <= 0;
+            for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                Q1[j]<=0;
+                Q2[j]<=0;
+                id[j]<=0;
+                op[j]<=0;
+            end
         end
         else if (!rdy_in) begin
             
@@ -125,7 +133,7 @@ module SLBuffer
             receive_commit[q_wr_ptr] <= _receive_commit;
             if (update_control) begin
                     for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
-                        if (Q1[j]==target_ROB_pos) begin
+                        if (Q1[j]===target_ROB_pos) begin
                             Q1[j] <= 0;
                             V1[j] <= V_ex;
                         end
@@ -226,7 +234,7 @@ module SLBuffer
     assign mem_addr  = sub_ex_module_result;
     assign mem_wr    = _op_tmp[9:7]==3;
     assign mem_dout  = (_op_tmp[9:7]==3)? V2[_q_rd_ptr][7:0]:0;
-    assign access_control = exable[_q_rd_ptr];
+    assign access_control = !q_empty && exable[_q_rd_ptr];
 
     genvar i;
     generate 

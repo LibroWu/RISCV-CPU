@@ -15,7 +15,7 @@ module Issue
     output wire toSLB,
     output wire toRS,
 
-    output wire [7:0]    op,
+    output wire [9:0]    op,
     output wire [31:0]   immediate,
     output wire [31:0]   npc
     );

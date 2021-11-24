@@ -1,13 +1,6 @@
 // RISCV32I CPU top module
 // port modification allowed for debugging purposes
 
-`include "IF.v"
-`include "issue.v"
-`include "ex.v"
-`include "regfile.v"
-`include "Rob.v"
-`include "Rs.v"
-`include "SLBuffer.v"
 module cpu(input wire clk_in,
            input wire rst_in,
            input wire rdy_in,
@@ -17,7 +10,6 @@ module cpu(input wire clk_in,
            output wire         mem_wr,
            input wire  io_buffer_full,         // 1 if uart buffer is full
            output wire [31:0] dbgreg_dout);
-    
     // implementation goes here
     
     // Specifications:
@@ -72,7 +64,8 @@ module cpu(input wire clk_in,
                   .rd(issue_rd),
                   .toSLB(issue_toSLB),
                   .toRS(issue_toRS),
-                  .npc(issue_npc)
+                  .npc(issue_npc),
+                  .op(issue_op)
                 );
     wire regfile_rd_control;
     assign regfile_rd_control = !(issue_op[9:7]==3 || issue_op[9:7]==4);
@@ -154,7 +147,7 @@ module cpu(input wire clk_in,
     Rob  _rob( .clk_in(clk_in),
                .rst_in(rst_in),
                .rdy_in(rdy_in),
-               .has_issue(issue_hasResult),
+               .has_issue(IF_has_instr),
                .isStore_input(issue_op[9:7]==3),
                .isBranch_input(issue_op[9:7]==4),
                .reg_addr(issue_rd),
@@ -215,7 +208,7 @@ module cpu(input wire clk_in,
     assign IF_access_valid = IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
     assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full);
     assign mem_wr = (!IF_access_valid || slb_access_valid && slb_mem_wr);
-    assign mem_addr = (IF_access_valid) ? IF_mem_addr:
+    assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:
                       0;
     assign mem_dout = slb_mem_dout;
