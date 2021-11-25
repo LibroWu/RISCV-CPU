@@ -30,6 +30,7 @@ module cpu(input wire clk_in,
     wire [Q_WIDTH-1:0] ROB_tail,Commit_Q;
     wire [REG_ADDR_WIDTH-1:0] commit_reg_addr;
     wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
+    wire control_hazard;
     //slb
     wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr;
     wire [Q_WIDTH-1:0] slb_target_ROB_pos;
@@ -38,11 +39,13 @@ module cpu(input wire clk_in,
     //IF
     wire IF_access_request,IF_access_valid,IF_has_instr,IF_rd_en;
     wire [7:0] IF_mem_din;
-    wire [31:0] IF_instr,IF_mem_addr,IF_npc;
+    wire [31:0] IF_instr,IF_mem_addr,IF_npc,IF_predict_pc;
     assign IF_rd_en = !rob_isFull;
     IF _if( .clk_in(clk_in),
             .rst_in(rst_in),
             .rdy_in(rdy_in),
+            .control_hazard(control_hazard),
+            .Commit_pc(Commit_pc),
             .rd_en(IF_rd_en),
             .access_valid(IF_access_valid),
             .mem_din(IF_mem_din),
@@ -50,22 +53,22 @@ module cpu(input wire clk_in,
             .access_control(IF_access_request),
             .has_instr(IF_has_instr),
             .instr(IF_instr),
-            .npc(IF_npc)
+            .npc(IF_npc),
+            .predict_pc_output(IF_predict_pc)
             );
     wire [4:0] issue_rs1,issue_rs2,issue_rd;
     wire issue_toRS,issue_toSLB;
     wire [9:0] issue_op;
-    wire [31:0] issue_immediate,issue_npc;
+    wire [31:0] issue_immediate;
     Issue _issue( .instr(IF_instr),
-                  .npc_input(IF_npc),
                   .has_instr(IF_has_instr),
                   .rs1(issue_rs1),
                   .rs2(issue_rs2),
                   .rd(issue_rd),
                   .toSLB(issue_toSLB),
                   .toRS(issue_toRS),
-                  .npc(issue_npc),
-                  .op(issue_op)
+                  .op(issue_op),
+                  .immediate(issue_immediate)
                 );
     wire regfile_rd_control;
     assign regfile_rd_control = !(issue_op[9:7]==3 || issue_op[9:7]==4);
@@ -104,6 +107,7 @@ module cpu(input wire clk_in,
     Rs _rs( .clk_in(clk_in),
             .rst_in(rst_in),
             .rdy_in(rdy_in),
+            .control_hazard(control_hazard),
             .input_valid(rs_input_valid),
             .rob_tag_input(ROB_tail),
             .op_input(issue_op),
@@ -111,7 +115,7 @@ module cpu(input wire clk_in,
             .Q2_input(Q2),
             .V1_input(V1),
             .V2_input(V2),
-            .npc_input(issue_npc),
+            .npc_input(IF_npc),
             .immediate_input(issue_immediate),
             .update_control(ex_has_result),
             .target_ROB_pos(ex_ROB_pos),
@@ -131,7 +135,7 @@ module cpu(input wire clk_in,
     assign rs_input_valid = (!IF_has_instr || (!has_ex_node && Q1==0 && Q2==0))? 0:1;
     assign ex_has_result = (has_ex_node || (IF_has_instr && issue_toRS && (Q1==0 && Q2==0)));
     assign ex_op = (has_ex_node)? rs_op : issue_op;
-    assign ex_npc = (has_ex_node)? rs_npc : issue_npc;
+    assign ex_npc = (has_ex_node)? rs_npc : IF_npc;
     assign ex_V1 = (has_ex_node)? rs_V1 : V1;
     assign ex_V2 = (has_ex_node)? rs_V2 : V2;
     assign ex_immediate = (has_ex_node)? rs_immediate : issue_immediate;
@@ -149,10 +153,10 @@ module cpu(input wire clk_in,
                .rdy_in(rdy_in),
                .has_issue(IF_has_instr),
                .isStore_input(issue_op[9:7]==3),
-               .isBranch_input(issue_op[9:7]==4),
+               .isBranch_input(issue_op[9:7]==4 || issue_op[6:0]==7'b1100111),
                .reg_addr(issue_rd),
-               .pre_pc(),
-               .predict_pc(),
+               .pre_pc(IF_npc),
+               .predict_pc(IF_predict_pc),
                .has_slb_result(slb_has_result),
                .slb_target_ROB_pos(slb_target_ROB_pos),
                .V_slb(slb_V),
@@ -172,6 +176,7 @@ module cpu(input wire clk_in,
                .Commit_Q(Commit_Q),
                .Commit_V(Commit_V),
                .Commit_pc(Commit_pc),
+               .control_hazard(control_hazard),
                .empty(rob_isEmpty),
                .full(rob_isFull),
                .ROB_tail(ROB_tail)
@@ -179,6 +184,7 @@ module cpu(input wire clk_in,
     SLBuffer _slbuffer( .clk_in(clk_in),
                         .rst_in(rst_in),
                         .rdy_in(rdy_in),
+                        .control_hazard(control_hazard),
                         .input_valid(issue_toSLB),
                         .rob_id(ROB_tail),
                         .immediate_input(issue_immediate),

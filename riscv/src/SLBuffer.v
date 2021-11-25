@@ -17,6 +17,9 @@ module SLBuffer
     input   wire          rst_in,
     input   wire          rdy_in,
     
+    //from rob commit, process branch & jump
+    input   wire          control_hazard,
+   
     //input from issue result
     input   wire                input_valid,
     input   wire [Q_WIDTH-1:0]  rob_id,
@@ -69,6 +72,9 @@ module SLBuffer
     wire [3:0] d_wr_ptr;
     wire [1:0] target_counter,_target_counter;
     reg  [1:0] counter,_counter;
+    reg [SLB_WIDTH-1:0] last_commit_pos;
+    wire [SLB_WIDTH-1:0] _last_commit_pos;
+    reg has_last_commit;
     reg         q_empty;
     wire        d_empty;
     reg        _q_empty;
@@ -93,6 +99,8 @@ module SLBuffer
     integer j;
     always @(posedge clk_in) begin
         if (rst_in) begin
+            has_last_commit <= 0;
+            last_commit_pos <= 0;
             q_rd_ptr      <= 0;
             q_wr_ptr      <= 0;
             _q_rd_ptr     <= 0;
@@ -114,61 +122,91 @@ module SLBuffer
             end
         end
         else if (!rdy_in) begin
-            
+
         end else begin
-            q_rd_ptr                 <= d_rd_ptr;
-            _q_rd_ptr                <= _d_rd_ptr;
-            q_wr_ptr                 <= d_wr_ptr;
-            q_empty                  <= d_empty;
-            q_full                   <= d_full;
-            _q_empty                 <= _d_empty;
-            _q_full                  <= _d_full;
-            Q1[q_wr_ptr]             <= _Q1;
-            Q2[q_wr_ptr]             <= _Q2;
-            V1[q_wr_ptr]             <= _V1;
-            V2[q_wr_ptr]             <= _V2;
-            immediate[q_wr_ptr]      <= _immediate;
-            op[q_wr_ptr]             <= _op;
-            isStore[q_wr_ptr]        <= _isStore;
-            receive_commit[q_wr_ptr] <= _receive_commit;
-            if (update_control) begin
-                    for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
-                        if (Q1[j]===target_ROB_pos) begin
-                            Q1[j] <= 0;
-                            V1[j] <= V_ex;
-                        end
-                        if (Q2[j]==target_ROB_pos) begin
-                            Q2[j] <= 0;
-                            V2[j] <= V_ex;
-                        end
-                    end
-            end
-            if (has_commit) begin
-                for (j = 0; j<2**SLB_WIDTH ; j=j+1) begin
-                    if (id[j]==Commit_Q) begin
-                        receive_commit[j] <= 1;
-                    end
-                end
-            end
-            if (access_valid) begin
-                if (_counter == _target_counter) begin
-                    _counter <= 0;
+            if (control_hazard) begin
+                if (!has_last_commit) begin
+                    has_last_commit <= 0;
+                    last_commit_pos <= 0;
+                    q_rd_ptr      <= 0;
+                    q_wr_ptr      <= 0;
+                    _q_rd_ptr     <= 0;
+                    q_empty       <= 1'b1;
+                    q_full        <= 1'b0;
+                    _q_empty      <= 1'b1;
+                    _q_full       <= 1'b0;
+                    _access_valid <= 1'b0;
+                    V_tmp         <= 0;
+                    counter       <= 0;
+                    _counter      <= 0;
+                    isStore       <= 0;
+                    receive_commit    <= 0;
                 end else begin
-                    V1[_q_rd_ptr] <= sub_ex_module_result;
-                    V2[_q_rd_ptr] <= V2[_q_rd_ptr] >> 8;
-                    immediate[_q_rd_ptr] <= 1;
-                    _counter <= _counter + 1;
+                q_wr_ptr <= _last_commit_pos;
+                last_commit_pos <= 0;
                 end
-            end
-            _access_valid <= access_valid;
-            if (_access_valid) begin
-                if (counter==target_counter) begin
-                    counter <= 0;
-                end else counter <= counter + 1;
+            end else begin
+                q_rd_ptr                 <= d_rd_ptr;
+                _q_rd_ptr                <= _d_rd_ptr;
+                q_wr_ptr                 <= d_wr_ptr;
+                q_empty                  <= d_empty;
+                q_full                   <= d_full;
+                _q_empty                 <= _d_empty;
+                _q_full                  <= _d_full;
+                Q1[q_wr_ptr]             <= _Q1;
+                Q2[q_wr_ptr]             <= _Q2;
+                V1[q_wr_ptr]             <= _V1;
+                V2[q_wr_ptr]             <= _V2;
+                immediate[q_wr_ptr]      <= _immediate;
+                op[q_wr_ptr]             <= _op;
+                isStore[q_wr_ptr]        <= _isStore;
+                receive_commit[q_wr_ptr] <= _receive_commit;
+                if (_rd_en_prot && has_last_commit && last_commit_pos==_q_rd_ptr) begin
+                    has_last_commit <= 0;
+                    last_commit_pos <= 0;
+                end
+                if (update_control) begin
+                        for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                            if (Q1[j]===target_ROB_pos) begin
+                                Q1[j] <= 0;
+                                V1[j] <= V_ex;
+                            end
+                            if (Q2[j]==target_ROB_pos) begin
+                                Q2[j] <= 0;
+                                V2[j] <= V_ex;
+                            end
+                        end
+                end
+                if (has_commit) begin
+                    for (j = 0; j<2**SLB_WIDTH ; j=j+1) begin
+                        if (id[j]==Commit_Q) begin
+                            receive_commit[j] <= 1;
+                            last_commit_pos <= j;
+                            has_last_commit <= 1;
+                        end
+                    end
+                end
+                if (access_valid) begin
+                    if (_counter == _target_counter) begin
+                        _counter <= 0;
+                    end else begin
+                        V1[_q_rd_ptr] <= sub_ex_module_result;
+                        V2[_q_rd_ptr] <= V2[_q_rd_ptr] >> 8;
+                        immediate[_q_rd_ptr] <= 1;
+                        _counter <= _counter + 1;
+                    end
+                end
+                _access_valid <= access_valid;
+                if (_access_valid) begin
+                    if (counter==target_counter) begin
+                        counter <= 0;
+                    end else counter <= counter + 1;
+                end
             end
         end
     end
 
+    assign _last_commit_pos = last_commit_pos + 1;
 
     // Derive "protected" read/write signals.
     assign _rd_en_prot    = (exable[_q_rd_ptr] && _counter == _target_counter && !_q_empty);
@@ -233,7 +271,7 @@ module SLBuffer
     assign empty     = q_empty;
     assign mem_addr  = sub_ex_module_result;
     assign mem_wr    = _op_tmp[9:7]==3;
-    assign mem_dout  = (_op_tmp[9:7]==3)? V2[_q_rd_ptr][7:0]:0;
+    assign mem_dout  = V2[_q_rd_ptr][7:0];
     assign access_control = !q_empty && exable[_q_rd_ptr];
 
     genvar i;

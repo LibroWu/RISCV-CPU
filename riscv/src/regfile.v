@@ -44,23 +44,19 @@ module regfile
         end
         else
         begin
-            if (has_commit) begin
+            if (has_commit && commit_target!=0) begin
                 regs[commit_target] <= Commit_V;
                 if (Q[commit_target]==Commit_Q) begin
                     Q[commit_target] <= 0;
                 end
             end
-            if (rd_control) begin
+            if (rd_control && commit_target!=0) begin
                 Q[rd] <= Q_value;
             end
         end
     end
-    assign Q1 = Q[rs1];
-    assign Q2 = Q[rs2];
+    assign Q1 = (Q_value==Q[rs1])?0:Q[rs1];
+    assign Q2 = (Q_value==Q[rs2])?0:Q[rs2];
     assign V1 = regs[rs1];
     assign V2 = regs[rs2];
-    always @(regs[0] | Q[0]) begin
-        regs[0] <= 0;
-        Q[0] <= 0;
-    end
 endmodule

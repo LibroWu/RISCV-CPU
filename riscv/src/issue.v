@@ -5,7 +5,6 @@ module Issue
     )
     (
     input wire [31:0]     instr,
-    input wire [31:0] npc_input,
     input wire        has_instr,
     
     output wire [REG_ADDR_WIDTH-1:0] rs1,
@@ -16,8 +15,7 @@ module Issue
     output wire toRS,
 
     output wire [9:0]    op,
-    output wire [31:0]   immediate,
-    output wire [31:0]   npc
+    output wire [31:0]   immediate
     );
     
     wire [31:0] immediateI,immediateS,immediateB,immediateU,immediateJ;
@@ -69,7 +67,6 @@ module Issue
                   (instr[6:0]==7'b1100011)?1:
                   0;
     assign op = {type,sub_opcode_head,sub_opcode};
-    assign npc = npc_input;
     // always @(*) begin
     //     case (instr[6:0])
     //         7'b0100011: begin

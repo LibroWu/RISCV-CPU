@@ -17,6 +17,8 @@ endmodule
         input   wire          rst_in,
         input   wire          rdy_in,
         
+        input   wire  control_hazard,
+
         //input from issue
         input   wire             input_valid,
         input   wire [Q_WIDTH-1:0]  rob_tag_input,
