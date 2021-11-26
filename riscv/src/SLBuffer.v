@@ -46,6 +46,7 @@ module SLBuffer
     output  wire [7:0]    mem_dout,
     output  wire [31:0]   mem_addr,
     output  wire          access_control, //1 if need to do mem access
+    output  wire          access_valid_output,
     output  wire          mem_wr,          //1 for write
 
     output  wire          has_result,
@@ -55,10 +56,10 @@ module SLBuffer
     
     wire [2**SLB_WIDTH-1:0] exable;
     reg [9:0] op [2**SLB_WIDTH-1:0];
-    wire _op;
+    wire [9:0] _op;
     reg [Q_WIDTH-1:0] Q1[2**SLB_WIDTH-1:0],Q2[2**SLB_WIDTH-1:0],id[2**SLB_WIDTH-1:0];
     wire [Q_WIDTH-1:0] _Q1,_Q2,_id;
-    reg [31:0] V_tmp;
+    wire [31:0] V_tmp;
     reg [7:0] _mem_dout;
     reg [31:0] V1[2**SLB_WIDTH-1:0],V2[2**SLB_WIDTH-1:0],immediate[2**SLB_WIDTH-1:0];
     wire [31:0] _V1,_V2,_immediate;
@@ -109,7 +110,6 @@ module SLBuffer
             _q_empty      <= 1'b1;
             _q_full       <= 1'b0;
             _access_valid <= 1'b0;
-            V_tmp         <= 0;
             counter       <= 0;
             _counter      <= 0;
             isStore       <= 0;
@@ -136,7 +136,6 @@ module SLBuffer
                     _q_empty      <= 1'b1;
                     _q_full       <= 1'b0;
                     _access_valid <= 1'b0;
-                    V_tmp         <= 0;
                     counter       <= 0;
                     _counter      <= 0;
                     isStore       <= 0;
@@ -159,6 +158,7 @@ module SLBuffer
                 V2[q_wr_ptr]             <= _V2;
                 immediate[q_wr_ptr]      <= _immediate;
                 op[q_wr_ptr]             <= _op;
+                id[q_wr_ptr]             <= _id;
                 isStore[q_wr_ptr]        <= _isStore;
                 receive_commit[q_wr_ptr] <= _receive_commit;
                 if (_rd_en_prot && has_last_commit && last_commit_pos==_q_rd_ptr) begin
@@ -209,8 +209,8 @@ module SLBuffer
     assign _last_commit_pos = last_commit_pos + 1;
 
     // Derive "protected" read/write signals.
-    assign _rd_en_prot    = (exable[_q_rd_ptr] && _counter == _target_counter && !_q_empty);
-    assign rd_en_prot     = (counter==target_counter && !q_empty);
+    assign _rd_en_prot    = (access_valid && _counter == _target_counter && !_q_empty);
+    assign rd_en_prot     = (_access_valid && counter==target_counter && !q_empty);
     assign wr_en_prot     = (input_valid && !q_full);
     
     // Handle writes.
@@ -253,6 +253,10 @@ module SLBuffer
     wire [9:0] op_tmp,_op_tmp;
     assign op_tmp = op[q_rd_ptr];
     assign _op_tmp = op[_q_rd_ptr];
+    assign V_tmp[7:0] = (counter==0)? mem_din:V_tmp[7:0];
+    assign V_tmp[15:8] = (counter==1)? mem_din:V_tmp[15:8];
+    assign V_tmp[23:16] = (counter==2)? mem_din:V_tmp[23:16];
+    assign V_tmp[31:24] = (counter==3)? mem_din:V_tmp[31:24];
     assign target_counter = (op_tmp[1:0]==0)? 0:
                             (op_tmp[1:0]==1)? 1:
                             (op_tmp[1:0]==2)? 3:
@@ -272,7 +276,8 @@ module SLBuffer
     assign mem_addr  = sub_ex_module_result;
     assign mem_wr    = _op_tmp[9:7]==3;
     assign mem_dout  = V2[_q_rd_ptr][7:0];
-    assign access_control = !q_empty && exable[_q_rd_ptr];
+    assign access_control = !_q_empty && exable[_q_rd_ptr];
+    assign access_valid_output = _access_valid;
 
     genvar i;
     generate 

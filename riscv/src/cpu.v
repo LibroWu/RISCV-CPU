@@ -40,6 +40,7 @@ module cpu(input wire clk_in,
     wire IF_access_request,IF_access_valid,IF_has_instr,IF_rd_en;
     wire [7:0] IF_mem_din;
     wire [31:0] IF_instr,IF_mem_addr,IF_npc,IF_predict_pc;
+    wire SLB_pre_access_valid,IF_pre_access_valid;
     assign IF_rd_en = !rob_isFull;
     IF _if( .clk_in(clk_in),
             .rst_in(rst_in),
@@ -54,7 +55,8 @@ module cpu(input wire clk_in,
             .has_instr(IF_has_instr),
             .instr(IF_instr),
             .npc(IF_npc),
-            .predict_pc_output(IF_predict_pc)
+            .predict_pc_output(IF_predict_pc),
+            .access_valid_output(IF_pre_access_valid)
             );
     wire [4:0] issue_rs1,issue_rs2,issue_rd;
     wire issue_toRS,issue_toSLB;
@@ -71,7 +73,7 @@ module cpu(input wire clk_in,
                   .immediate(issue_immediate)
                 );
     wire regfile_rd_control;
-    assign regfile_rd_control = !(issue_op[9:7]==3 || issue_op[9:7]==4);
+    assign regfile_rd_control = IF_has_instr &&!(issue_op[9:7]==3 || issue_op[9:7]==4);
     wire [31:0] regfile_V1,regfile_V2,V1,V2,ex_V1,ex_V2,ex_immediate,ex_npc,ex_V,ex_tpc;
     wire [Q_WIDTH-1:0] regfile_Q1,regfile_Q2,Q1,Q2;
     wire [9:0]  ex_op;
@@ -91,7 +93,7 @@ module cpu(input wire clk_in,
                       .rd_control(regfile_rd_control),
                       .rd(issue_rd),
                       .Q_value(ROB_tail),
-                      .has_commit(commit_modify_regfile),
+                      .has_commit(has_commit && commit_modify_regfile),
                       .commit_target(commit_reg_addr),
                       .Commit_Q(Commit_Q),
                       .Commit_V(Commit_V),
@@ -153,7 +155,7 @@ module cpu(input wire clk_in,
                .rdy_in(rdy_in),
                .has_issue(IF_has_instr),
                .isStore_input(issue_op[9:7]==3),
-               .isBranch_input(issue_op[9:7]==4 || issue_op[6:0]==7'b1100111),
+               .isBranch_input(issue_op[9:7]==4 || IF_instr[6:0]==7'b1100111),
                .reg_addr(issue_rd),
                .pre_pc(IF_npc),
                .predict_pc(IF_predict_pc),
@@ -207,12 +209,13 @@ module cpu(input wire clk_in,
                         .mem_wr(slb_mem_wr),
                         .has_result(slb_has_result),
                         .slb_target_ROB_pos(slb_target_ROB_pos),
-                        .V(slb_V)
+                        .V(slb_V),
+                        .access_valid_output(SLB_pre_access_valid)
     );
 
     //mem access control
-    assign IF_access_valid = IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
-    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full);
+    assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
+    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) && !(SLB_pre_access_valid || IF_pre_access_valid);
     assign mem_wr = (!IF_access_valid || slb_access_valid && slb_mem_wr);
     assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:

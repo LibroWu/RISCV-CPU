@@ -50,7 +50,7 @@ module regfile
                     Q[commit_target] <= 0;
                 end
             end
-            if (rd_control && commit_target!=0) begin
+            if (rd_control && rd!=0) begin
                 Q[rd] <= Q_value;
             end
         end

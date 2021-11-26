@@ -71,11 +71,13 @@ module Rob
     integer j;
     always @(posedge clk_in) begin
         if (rst_in) begin
-            q_rd_ptr <= 1;
-            q_wr_ptr <= 1;
-            q_empty  <= 1'b1;
-            q_full   <= 1'b0;
+            q_rd_ptr  <= 1;
+            q_wr_ptr  <= 1;
+            q_empty   <= 1'b1;
+            q_full    <= 1'b0;
             has_value <= 0;
+            isBranch  <= 0;
+            isStore   <= 0;
         end
         else if (!rdy_in) begin
             
@@ -86,6 +88,8 @@ module Rob
                 q_empty  <= 1'b1;
                 q_full   <= 1'b0;
                 has_value <= 0;
+                isBranch  <= 0;
+                isStore   <= 0;
             end else begin
                 q_rd_ptr            <= d_rd_ptr;
                 q_wr_ptr            <= d_wr_ptr;

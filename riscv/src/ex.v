@@ -62,18 +62,19 @@ module EX
         end
         4:begin
           //B
-            case (op[3:0])
-              0:  _true_pc<=npc + ( (V1 == V2)? immediate: 4);
-              1:  _true_pc<=npc + ( (V1 != V2)? immediate: 4);
-              4:  _true_pc<=npc + ( ($signed(V1) < $signed(V2))? immediate: 4);
-              5:  _true_pc<=npc + ( (!($signed(V1) < $signed(V2)))? immediate: 4);
-              6:  _true_pc<=npc + ( (V1<V2)? immediate: 4);
-              7:  _true_pc<=npc + ( (!(V1<V2))? immediate: 4);
+            case (op[2:0])
+              0:  _true_pc <= npc + ( (V1 == V2)? immediate: 4);
+              1:  _true_pc <= npc + ( (V1 != V2)? immediate: 4);
+              4:  _true_pc <= npc + ( ($signed(V1) < $signed(V2))? immediate: 4);
+              5:  _true_pc <= npc + ( (!($signed(V1) < $signed(V2)))? immediate: 4);
+              6:  _true_pc <= npc + ( (V1<V2)? immediate: 4);
+              7:  _true_pc <= npc + ( (!(V1<V2))? immediate: 4);
               default: _true_pc <= 0;
             endcase
         end
         5:begin
           //U
+            _V <= 0;
             if (op[6:4]==1) begin
                 _V <= immediate;
             end else if (op[6:4]==2) begin

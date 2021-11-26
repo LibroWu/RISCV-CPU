@@ -15,6 +15,7 @@ module IF(
     input   wire [7:0]    mem_din,
     output  wire [31:0]   mem_addr,
     output  wire          access_control, // 1 to request a mem access
+    output  wire          access_valid_output,
     
     output  wire          has_instr,//1 if the instruction is ready
     output  wire [31:0]   instr,
@@ -32,7 +33,6 @@ module IF(
     wire                 d_full;
 
     reg [31:0] instr_queue [15:0],pc_que[15:0],predict_pc_queue[15:0];
-    reg [31:0] pc;
     wire [31:0] _instr,instr_tmp;
     reg [31:0] _pc;
     wire [31:0] _pc_preserve,_predict_pc_queue;
@@ -59,7 +59,6 @@ module IF(
         if (rst_in) begin
             stall <= 0;
             _access_valid <= 0;
-            pc <= 0;
             _pc <= 0;
             counter<=0;
             _counter <= 0;
@@ -79,7 +78,6 @@ module IF(
             if (control_hazard) begin
                 stall <= 0;
                 _access_valid <= 0;
-                pc <= Commit_pc;
                 _pc <= Commit_pc;
                 counter<=0;
                 _counter <= 0;
@@ -174,5 +172,6 @@ module IF(
     assign full      = q_full;
     assign empty     = q_empty;
     assign access_control = !stall && !q_full;
+    assign access_valid_output = _access_valid;
     assign mem_addr  = predict_pc;
 endmodule
