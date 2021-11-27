@@ -178,13 +178,37 @@ module SLBuffer
                         end
                 end
                 if (has_commit) begin
-                    for (j = 0; j<2**SLB_WIDTH ; j=j+1) begin
-                        if (id[j]==Commit_Q) begin
-                            receive_commit[j] <= 1;
-                            last_commit_pos <= j;
-                            has_last_commit <= 1;
+                 if (q_rd_ptr<q_wr_ptr) begin
+                        for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
+                            if (id[j]==Commit_Q) begin
+                                    receive_commit[j] <= 1;
+                                    last_commit_pos <= j;
+                                    has_last_commit <= 1;
+                                end
+                        end
+                    end else begin
+                        for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
+                            if (id[j]==Commit_Q) begin
+                                    receive_commit[j] <= 1;
+                                    last_commit_pos <= j;
+                                    has_last_commit <= 1;
+                                end
+                        end
+                        for (j = 0; j<q_wr_ptr; j=j+1) begin
+                             if (id[j]==Commit_Q) begin
+                                    receive_commit[j] <= 1;
+                                    last_commit_pos <= j;
+                                    has_last_commit <= 1;
+                                end
                         end
                     end
+                    // for (j = 0; j<2**SLB_WIDTH ; j=j+1) begin
+                    //     if (id[j]==Commit_Q) begin
+                    //         receive_commit[j] <= 1;
+                    //         last_commit_pos <= j;
+                    //         has_last_commit <= 1;
+                    //     end
+                    // end
                 end
                 if (access_valid) begin
                     if (_counter == _target_counter) begin
@@ -219,7 +243,7 @@ module SLBuffer
     assign _Q2             = (wr_en_prot)  ?               Q2_input : Q2[q_wr_ptr];
     assign _V1             = (wr_en_prot)  ?               V1_input : V1[q_wr_ptr];
     assign _V2             = (wr_en_prot)  ?               V2_input : V2[q_wr_ptr];
-    assign _isStore        = (wr_en_prot)  ? (op_input[2:0]==3?1:0) : isStore[q_wr_ptr];
+    assign _isStore        = (wr_en_prot)  ? (op_input[9:7]==3?1:0) : isStore[q_wr_ptr];
     assign _op             = (wr_en_prot)  ?               op_input : op[q_wr_ptr];
     assign _receive_commit = (wr_en_prot)  ?                      0 : receive_commit[q_wr_ptr];
     assign _immediate      = (wr_en_prot)  ?        immediate_input : immediate[q_wr_ptr];
@@ -274,7 +298,7 @@ module SLBuffer
     assign full      = q_full;
     assign empty     = q_empty;
     assign mem_addr  = sub_ex_module_result;
-    assign mem_wr    = _op_tmp[9:7]==3;
+    assign mem_wr    = access_valid && _op_tmp[9:7]==3;
     assign mem_dout  = V2[_q_rd_ptr][7:0];
     assign access_control = !_q_empty && exable[_q_rd_ptr];
     assign access_valid_output = _access_valid;

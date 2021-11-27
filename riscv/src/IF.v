@@ -40,15 +40,15 @@ module IF(
     reg _access_valid;
     wire rd_en_prot;
     wire wr_en_prot;
-    reg stall;
+    reg stall,flag;
 
     //predict part
     //implement as static predict except JAL
-    wire [31:0] immediate;
+    wire [31:0] immediate; 
     wire predict_jump;
     assign predict_jump = 1'b0;
     wire [31:0] predict_pc;
-    assign immediate = (counter!=3) ? {30'b0,_counter}:
+    assign immediate = (flag || _counter!=0) ? {30'b0,_counter}:
                        (instr_tmp[6:0]==7'b1101111)?{{12{instr_tmp[31]}},instr_tmp[19:12],instr_tmp[20],instr_tmp[30:21],1'b0}:
                        (instr_tmp[6:0]==7'b1100011 && predict_jump)?{{20{instr_tmp[31]}},instr_tmp[7],instr_tmp[30:25],instr_tmp[11:8],1'b0}:
                        4;
@@ -58,6 +58,7 @@ module IF(
     always @(posedge clk_in) begin
         if (rst_in) begin
             stall <= 0;
+            flag  <= 1;
             _access_valid <= 0;
             _pc <= 0;
             counter<=0;
@@ -78,6 +79,7 @@ module IF(
             if (control_hazard) begin
                 stall <= 0;
                 _access_valid <= 0;
+                flag<= 1;
                 _pc <= Commit_pc;
                 counter<=0;
                 _counter <= 0;
@@ -100,9 +102,10 @@ module IF(
                 predict_pc_queue[q_wr_ptr] <= _predict_pc_queue;
                 _access_valid <= access_valid;
                 if (access_valid) begin
+                    flag<=0;
                     _counter <= _counter + 1;
                     //pc  <= predict_pc;
-                    if (counter==3) begin
+                    if (counter==3 && _access_valid) begin
                         _pc <= predict_pc;
                     end
                 end
@@ -138,7 +141,7 @@ module IF(
     // end
     // Derive "protected" read/write signals.
     assign rd_en_prot = (rd_en && !q_empty);
-    assign wr_en_prot = (counter==3 && !q_full);
+    assign wr_en_prot = (counter==3 && _access_valid && !q_full);
 
     // Handle writes.
     assign d_wr_ptr = (wr_en_prot)  ? q_wr_ptr + 1'h1 : q_wr_ptr;

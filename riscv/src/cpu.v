@@ -134,7 +134,7 @@ module cpu(input wire clk_in,
             .npc_output(rs_npc),
             .RS_Full(RS_full)
     );
-    assign rs_input_valid = (!IF_has_instr || (!has_ex_node && Q1==0 && Q2==0))? 0:1;
+    assign rs_input_valid = !(!IF_has_instr || (!has_ex_node && Q1==0 && Q2==0));
     assign ex_has_result = (has_ex_node || (IF_has_instr && issue_toRS && (Q1==0 && Q2==0)));
     assign ex_op = (has_ex_node)? rs_op : issue_op;
     assign ex_npc = (has_ex_node)? rs_npc : IF_npc;
@@ -187,7 +187,7 @@ module cpu(input wire clk_in,
                         .rst_in(rst_in),
                         .rdy_in(rdy_in),
                         .control_hazard(control_hazard),
-                        .input_valid(issue_toSLB),
+                        .input_valid(IF_has_instr && issue_toSLB),
                         .rob_id(ROB_tail),
                         .immediate_input(issue_immediate),
                         .op_input(issue_op),
@@ -216,7 +216,7 @@ module cpu(input wire clk_in,
     //mem access control
     assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
     assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) && !(SLB_pre_access_valid || IF_pre_access_valid);
-    assign mem_wr = (!IF_access_valid || slb_access_valid && slb_mem_wr);
+    assign mem_wr = (slb_access_valid && slb_mem_wr);
     assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:
                       0;
