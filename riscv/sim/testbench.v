@@ -9,7 +9,7 @@ reg rst;
     initial begin
         $dumpfile("cpu_.vcd");
         $dumpvars(0,testbench);
-        #10000 $finish;
+        #300000000 $finish;
     end
 riscv_top #(.SIM(1)) top(
     .EXCLK(clk),

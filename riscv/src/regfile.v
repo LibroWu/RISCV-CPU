@@ -44,7 +44,9 @@ module regfile
         end
         else
         begin
+            //$display("%h",regs[31]);
             if (has_commit && commit_target!=0) begin
+                //$display("%h %h",commit_target,Commit_V);
                 regs[commit_target] <= Commit_V;
                 if (Q[commit_target]==Commit_Q) begin
                     Q[commit_target] <= 0;

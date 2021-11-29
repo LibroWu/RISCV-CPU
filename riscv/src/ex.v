@@ -35,17 +35,15 @@ module EX
           //I
           if (op[6:4]==2) begin
             //0010011
-            case (op[3:0])
+            case (op[2:0])
               0:  _V <= V1 + immediate;
               1:  _V <= V1 << immediate[5:0];
               2:  _V <= $signed(V1) < $signed(immediate);
               3:  _V <= V1 < immediate;
               4:  _V <= V1 ^ immediate;
-              5:  _V <= V1 >> immediate[5:0];
+              5:  _V <= (op[3]==1'b1)? (V1>>>immediate[5:0]):(V1 >> immediate[5:0]);
               6:  _V <= V1 | immediate;
               7:  _V <= V1 & immediate;
-              8:  _V <= V1 - immediate;
-              13: _V <= V1 >>> immediate[5:0];
               default: _V <= 0;
             endcase
           end else if (op[6:4]==3) begin

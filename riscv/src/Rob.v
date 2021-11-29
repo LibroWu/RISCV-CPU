@@ -35,7 +35,7 @@ module Rob
     output wire [31:0] V2,
     
     //commit
-    output  wire                  has_commit,
+    output  wire                  has_commit_toSLB,
     output  wire                  commit_modify_regfile,
     output  wire  [REG_ADDR_WIDTH-1:0] commit_reg_addr,
     output  wire  [Q_WIDTH-1:0]   Commit_Q,
@@ -63,11 +63,11 @@ module Rob
 
     reg [REG_ADDR_WIDTH-1:0] rob_reg_addr [2**Q_WIDTH-1:0];
     reg [31:0] rob_V [2**Q_WIDTH-1:0];
-    reg [31:0] rob_npc [2**Q_WIDTH-1:0],rob_predict_pc[2**Q_WIDTH-1:0];
+    reg [31:0] rob_npc [2**Q_WIDTH-1:0],rob_predict_pc[2**Q_WIDTH-1:0],pre_pc_queue[2**Q_WIDTH-1:0];
     reg [2**Q_WIDTH-1:0] has_value,isStore,isBranch;
     wire _has_value,_isStore,_isBranch;
     wire [REG_ADDR_WIDTH-1:0] _rob_reg_addr;
-    wire [31:0] _rob_predict_pc;
+    wire [31:0] _rob_predict_pc,_pre_pc_queue;
     integer j;
     always @(posedge clk_in) begin
         if (rst_in) begin
@@ -82,6 +82,9 @@ module Rob
         else if (!rdy_in) begin
             
         end else begin
+            // if (rd_en_prot) begin
+            //     $display("%d",pre_pc_queue[q_rd_ptr]);
+            // end
             if (control_hazard) begin
                 q_rd_ptr <= 1;
                 q_wr_ptr <= 1;
@@ -100,6 +103,7 @@ module Rob
                 isBranch[q_wr_ptr] <= _isBranch;
                 isStore[q_wr_ptr] <= _isStore;
                 rob_predict_pc[q_wr_ptr] <= _rob_predict_pc;
+                pre_pc_queue[q_wr_ptr] <= _pre_pc_queue;
                 if (has_ex_result) begin
                     rob_V[target_ROB_pos] <= V_ex;
                     rob_npc[target_ROB_pos] <= pc_ex;
@@ -123,7 +127,8 @@ module Rob
     assign _isStore = (wr_en_prot) ? isStore_input:isStore[q_wr_ptr];
     assign _isBranch = (wr_en_prot) ? isBranch_input: isBranch[q_wr_ptr];
     assign _rob_reg_addr = (wr_en_prot) ? reg_addr: rob_reg_addr[q_wr_ptr];
-    assign _rob_predict_pc = (wr_en_prot) ? predict_pc:_rob_predict_pc;
+    assign _rob_predict_pc = (wr_en_prot) ? predict_pc: rob_predict_pc[q_wr_ptr];
+    assign _pre_pc_queue = (wr_en_prot) ? pre_pc : pre_pc_queue[q_wr_ptr];
     
     // Handle commits.
     assign d_rd_ptr = (rd_en_prot) ? (q_rd_ptr+1'h1==0 ? 1 : q_rd_ptr + 1'h1) : q_rd_ptr;
@@ -150,13 +155,13 @@ module Rob
                       ) && wr_en_prot));
 
     // Assign output signals to appropriate FFs.
-    assign has_commit = rd_en_prot;
+    assign has_commit_toSLB = rd_en_prot && isStore[q_rd_ptr];
     assign commit_reg_addr = rob_reg_addr[q_rd_ptr];
     assign Commit_V = rob_V[q_rd_ptr];
     assign Commit_Q = q_rd_ptr;
     assign Commit_pc = rob_npc[q_rd_ptr];
-    assign commit_modify_regfile = !(isStore[q_rd_ptr] || isBranch[q_rd_ptr]);
-    assign control_hazard = (isBranch[q_rd_ptr] && rob_npc[q_rd_ptr]!=rob_predict_pc[q_rd_ptr]);
+    assign commit_modify_regfile = rd_en_prot && !(isStore[q_rd_ptr] || isBranch[q_rd_ptr]);
+    assign control_hazard = rd_en_prot && (isBranch[q_rd_ptr] && rob_npc[q_rd_ptr]!=rob_predict_pc[q_rd_ptr]);
     assign full    = q_full;
     assign empty   = q_empty;
     assign ROB_tail = q_wr_ptr;

@@ -26,7 +26,7 @@ module cpu(input wire clk_in,
     parameter SLB_WIDTH = 4;
     parameter REG_ADDR_WIDTH = 5;
     //rob
-    wire rob_isFull,rob_isEmpty,commit_modify_regfile,has_commit,rob_has_value1,rob_has_value2;
+    wire rob_isFull,rob_isEmpty,commit_modify_regfile,has_commit_toSLB,rob_has_value1,rob_has_value2;
     wire [Q_WIDTH-1:0] ROB_tail,Commit_Q;
     wire [REG_ADDR_WIDTH-1:0] commit_reg_addr;
     wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
@@ -93,7 +93,7 @@ module cpu(input wire clk_in,
                       .rd_control(regfile_rd_control),
                       .rd(issue_rd),
                       .Q_value(ROB_tail),
-                      .has_commit(has_commit && commit_modify_regfile),
+                      .has_commit(commit_modify_regfile),
                       .commit_target(commit_reg_addr),
                       .Commit_Q(Commit_Q),
                       .Commit_V(Commit_V),
@@ -172,7 +172,7 @@ module cpu(input wire clk_in,
                .has_value2(rob_has_value2),
                .V1(rob_V1),
                .V2(rob_V2),
-               .has_commit(has_commit),
+               .has_commit_toSLB(has_commit_toSLB),
                .commit_modify_regfile(commit_modify_regfile),
                .commit_reg_addr(commit_reg_addr),
                .Commit_Q(Commit_Q),
@@ -198,7 +198,7 @@ module cpu(input wire clk_in,
                         .update_control(ex_has_result),
                         .target_ROB_pos(ex_ROB_pos),
                         .V_ex(ex_V),
-                        .has_commit(has_commit),
+                        .has_commit(has_commit_toSLB),
                         .Commit_Q(Commit_Q),
                         .Commit_V(Commit_V),
                         .access_valid(slb_access_valid),
@@ -236,7 +236,12 @@ module cpu(input wire clk_in,
         end
         else
         begin
-            
+        //      if (IF_has_instr && issue_toSLB && issue_op[9:7]==3 && V1[17:16]==2'b11) begin
+        //              $display("%h %h %h %h %h",IF_instr,issue_rs1,issue_rs2,V1,V2);
+        //      end
+        //      if (IF_has_instr && (issue_rd=='h08 || issue_rs1=='h08 || issue_rs2=='h08 || issue_rd == 'h0a)) begin
+        //              $display("%h %h %h %h %h %h %h %h %h %h %h",IF_instr,issue_op,issue_op[9:7],issue_op[3:0],issue_rd,issue_rs1,issue_rs2,ex_V1,ex_V2,ex_immediate,ex_V);
+        //      end
         end
     end
     
