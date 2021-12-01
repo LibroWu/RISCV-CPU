@@ -83,7 +83,8 @@ module Rob
             
         end else begin
             // if (rd_en_prot) begin
-            //     $display("%d",pre_pc_queue[q_rd_ptr]);
+            //     $display("%h",pre_pc_queue[q_rd_ptr]);
+            //     //$display("%d",pre_pc_queue[q_rd_ptr]);
             // end
             if (control_hazard) begin
                 q_rd_ptr <= 1;
