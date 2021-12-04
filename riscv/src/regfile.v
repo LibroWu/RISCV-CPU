@@ -4,11 +4,12 @@ module regfile
     parameter Q_WIDTH = 4
     )
     (
-    input  wire           clk_in,   // system clock
+    input   wire          clk_in,   // system clock
     input   wire          rst_in,
     input   wire          rdy_in,
-    input  wire  [REG_ADDR_WIDTH-1:0] rs1,      // rs1 address
-    input  wire  [REG_ADDR_WIDTH-1:0] rs2,      // rs2 address
+    input   wire  [REG_ADDR_WIDTH-1:0] rs1,      // rs1 address
+    input   wire  [REG_ADDR_WIDTH-1:0] rs2,      // rs2 address
+    input   wire          control_hazard, 
     
     //change Q value in issue
     input  wire  rd_control, //1 if change Q value in issue
@@ -44,16 +45,22 @@ module regfile
         end
         else
         begin
-            //$display("%h",regs[31]);
-            if (has_commit && commit_target!=0) begin
-                //$display("%h %h",commit_target,Commit_V);
-                regs[commit_target] <= Commit_V;
-                if (Q[commit_target]==Commit_Q) begin
-                    Q[commit_target] <= 0;
+            if (control_hazard) begin
+                for (i = 0;i<2**REG_ADDR_WIDTH;i = i+1) begin
+                    Q[i] <= 0;
                 end
-            end
-            if (rd_control && rd!=0) begin
-                Q[rd] <= Q_value;
+            end else begin
+                //$display("%h",regs[31]);
+                if (has_commit && commit_target!=0) begin
+                    //$display("%h %h",commit_target,Commit_V);
+                    regs[commit_target] <= Commit_V;
+                    if (Q[commit_target]==Commit_Q) begin
+                        Q[commit_target] <= 0;
+                    end
+                end
+                if (rd_control && rd!=0) begin
+                    Q[rd] <= Q_value;
+                end
             end
         end
     end

@@ -7,7 +7,7 @@ module testbench;
 reg clk;
 reg rst;
     initial begin
-        $dumpfile("cpu_.vcd");
+        $dumpfile("cpu_____.vcd");
         $dumpvars(0,testbench);
         //#300000000 $finish;
     end

@@ -41,6 +41,9 @@ module IF(
     wire rd_en_prot;
     wire wr_en_prot;
     reg stall,flag;
+    //icache
+    wire icache_hit;
+    wire [31:0] icache_instr;
 
     //predict part
     //implement as static predict except JAL
@@ -48,7 +51,9 @@ module IF(
     wire predict_jump;
     assign predict_jump = 1'b0;
     wire [31:0] predict_pc;
-    assign immediate = (flag || _counter!=0) ? {30'b0,_counter}:
+    assign immediate = (icache_hit)? ((icache_instr[6:0]==7'b1101111)?{{12{icache_instr[31]}},icache_instr[19:12],icache_instr[20],icache_instr[30:21],1'b0}:
+                       (icache_instr[6:0]==7'b1100011 && predict_jump)?{{20{icache_instr[31]}},icache_instr[7],icache_instr[30:25],icache_instr[11:8],1'b0}:4):
+                       (flag || _counter!=0) ? {30'b0,_counter}:
                        (instr_tmp[6:0]==7'b1101111)?{{12{instr_tmp[31]}},instr_tmp[19:12],instr_tmp[20],instr_tmp[30:21],1'b0}:
                        (instr_tmp[6:0]==7'b1100011 && predict_jump)?{{20{instr_tmp[31]}},instr_tmp[7],instr_tmp[30:25],instr_tmp[11:8],1'b0}:
                        4;
@@ -101,15 +106,6 @@ module IF(
                 pc_que[q_wr_ptr] <= _pc_preserve;
                 predict_pc_queue[q_wr_ptr] <= _predict_pc_queue;
                 _access_valid <= access_valid;
-                if (access_valid) begin
-                    flag<=0;
-                    _counter <= _counter + 1;
-                    //pc  <= predict_pc;
-                    if (counter==3 && _access_valid) begin
-                        _pc <= predict_pc;
-                    end
-                end
-                
                 if (_access_valid) begin
                     // case (counter)
                     //     0: instr_tmp[7:0] = mem_din;
@@ -123,6 +119,19 @@ module IF(
                     //   instr_tmp <= instr_tmp<<8 | {24'b0,mem_din};
                     // end
                     counter <= counter+1;
+                end
+                if (icache_hit) begin
+                    _counter <= 0;
+                    counter  <= 0;
+                    flag     <= 1;
+                    _pc      <= predict_pc;
+                end
+                if (access_valid) begin
+                    flag<=0;
+                    _counter <= _counter + 1;
+                    if (counter==3 && _access_valid) begin
+                        _pc <= predict_pc;
+                    end
                 end
             end 
         end
@@ -141,11 +150,11 @@ module IF(
     // end
     // Derive "protected" read/write signals.
     assign rd_en_prot = (rd_en && !q_empty);
-    assign wr_en_prot = (counter==3 && _access_valid && !q_full);
+    assign wr_en_prot = (( icache_hit || counter==3 && _access_valid ) && !q_full);
 
     // Handle writes.
     assign d_wr_ptr = (wr_en_prot)  ? q_wr_ptr + 1'h1 : q_wr_ptr;
-    assign _instr   = (wr_en_prot)  ? instr_tmp : instr_queue[q_wr_ptr];
+    assign _instr   = (wr_en_prot)  ? (icache_hit ? icache_instr : instr_tmp) : instr_queue[q_wr_ptr];
     assign _pc_preserve = (wr_en_prot) ? _pc : pc_que[q_wr_ptr];
     assign _predict_pc_queue = (wr_en_prot) ? predict_pc : predict_pc_queue[q_wr_ptr];
 
@@ -159,13 +168,13 @@ module IF(
     //   1) We were empty before and there was no write.
     //   2) We had one entry and there was a read.
     assign d_empty = ((q_empty && !wr_en_prot) ||
-                    (((q_wr_ptr - q_rd_ptr) == addr_bits_wide_1) && rd_en_prot));
+                    (((q_wr_ptr - q_rd_ptr) == addr_bits_wide_1) && rd_en_prot && !wr_en_prot));
 
     // Detect full state:
     //   1) We were full before and there was no read.
     //   2) We had n-1 entries and there was a write.
     assign d_full  = ((q_full && !rd_en_prot) ||
-                    (((q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot));
+                    (((q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot && !rd_en_prot));
 
     // Assign output signals to appropriate FFs.
     assign instr     = instr_queue[q_rd_ptr];
@@ -174,7 +183,19 @@ module IF(
     assign has_instr = rd_en_prot;
     assign full      = q_full;
     assign empty     = q_empty;
-    assign access_control = !stall && !q_full;
+    assign access_control = !icache_hit && !stall && !q_full;
     assign access_valid_output = _access_valid;
     assign mem_addr  = predict_pc;
+
+    icache _icache( .clk_in(clk_in),
+                    .rst_in(rst_in),
+                    .rdy_in(rdy_in),
+                    .input_valid(wr_en_prot),
+                    .request_valid(!q_full && counter==0),
+                    .pc_update(_pc_preserve),
+                    .instr_update(_instr),
+                    .pc_request(_pc),
+                    .output_valid(icache_hit),
+                    .instr_output(icache_instr)
+                    );
 endmodule

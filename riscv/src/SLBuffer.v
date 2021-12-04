@@ -51,7 +51,8 @@ module SLBuffer
 
     output  wire          has_result,
     output  wire [Q_WIDTH-1:0] slb_target_ROB_pos,
-    output  wire [31:0]   V
+    output  wire [31:0]   V,
+    output  wire          full
     );
     
     wire [2**SLB_WIDTH-1:0] exable;
@@ -141,8 +142,9 @@ module SLBuffer
                     isStore       <= 0;
                     receive_commit    <= 0;
                 end else begin
-                q_wr_ptr <= _last_commit_pos;
-                last_commit_pos <= 0;
+                    q_wr_ptr <= _last_commit_pos;
+                    last_commit_pos <= 0;
+                    has_last_commit <= 0;
                 end
             end else begin
                 q_rd_ptr                 <= d_rd_ptr;
@@ -177,10 +179,22 @@ module SLBuffer
                             end
                         end
                 end
+                if (has_result) begin
+                        for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                            if (Q1[j]==slb_target_ROB_pos) begin
+                                Q1[j] <= 0;
+                                V1[j] <= V;
+                            end
+                            if (Q2[j]==slb_target_ROB_pos) begin
+                                Q2[j] <= 0;
+                                V2[j] <= V;
+                            end
+                        end
+                end
                 if (has_commit) begin
                  if (q_rd_ptr<q_wr_ptr) begin
                         for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
-                            if (id[j]==Commit_Q) begin
+                            if (id[j]==Commit_Q && isStore[j]) begin
                                     receive_commit[j] <= 1;
                                     last_commit_pos <= j;
                                     has_last_commit <= 1;
@@ -188,14 +202,14 @@ module SLBuffer
                         end
                     end else begin
                         for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
-                            if (id[j]==Commit_Q) begin
+                            if (id[j]==Commit_Q && isStore[j]) begin
                                     receive_commit[j] <= 1;
                                     last_commit_pos <= j;
                                     has_last_commit <= 1;
                                 end
                         end
                         for (j = 0; j<q_wr_ptr; j=j+1) begin
-                             if (id[j]==Commit_Q) begin
+                             if (id[j]==Commit_Q && isStore[j]) begin
                                     receive_commit[j] <= 1;
                                     last_commit_pos <= j;
                                     has_last_commit <= 1;
@@ -259,17 +273,17 @@ module SLBuffer
     //   1) We were empty before and there was no write.
     //   2) We had one entry and there was a read.
     assign d_empty = ((q_empty && !wr_en_prot) ||
-                    (((q_wr_ptr - q_rd_ptr) == addr_bits_wide_1) && rd_en_prot));
+                    (((q_wr_ptr - q_rd_ptr) == addr_bits_wide_1) && rd_en_prot && !wr_en_prot));
     assign _d_empty = ((_q_empty && !wr_en_prot) ||
-                    (((q_wr_ptr - _q_rd_ptr) == addr_bits_wide_1) && _rd_en_prot));
+                    (((q_wr_ptr - _q_rd_ptr) == addr_bits_wide_1) && _rd_en_prot && !wr_en_prot));
 
     // Detect full state:
     //   1) We were full before and there was no read.
     //   2) We had n-1 entries and there was a write.
     assign d_full  = ((q_full && !rd_en_prot) ||
-                    (((q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot));
+                    (((q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot && !rd_en_prot));
     assign _d_full  = ((_q_full && !_rd_en_prot) ||
-                    (((_q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot));
+                    (((_q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot && !_rd_en_prot));
     
     // Assign output signals to appropriate FFs.
     assign has_result = (rd_en_prot && !isStore[q_rd_ptr]);

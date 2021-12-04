@@ -32,7 +32,7 @@ module cpu(input wire clk_in,
     wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
     wire control_hazard;
     //slb
-    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr;
+    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr,slb_isFull;
     wire [Q_WIDTH-1:0] slb_target_ROB_pos;
     wire [31:0] slb_V,slb_mem_addr;
     wire [7:0] slb_mem_din,slb_mem_dout;
@@ -41,7 +41,17 @@ module cpu(input wire clk_in,
     wire [7:0] IF_mem_din;
     wire [31:0] IF_instr,IF_mem_addr,IF_npc,IF_predict_pc;
     wire SLB_pre_access_valid,IF_pre_access_valid;
-    assign IF_rd_en = !rob_isFull;
+    //issue
+    wire [4:0] issue_rs1,issue_rs2,issue_rd;
+    wire issue_toRS,issue_toSLB;
+    wire [9:0] issue_op;
+    wire [31:0] issue_immediate;
+    //rs
+    wire rs_input_valid,RS_full,has_ex_node,ex_has_result;
+    wire [31:0] rs_V1,rs_V2,rs_immediate,rs_npc;
+    wire [Q_WIDTH-1:0] ex_ROB_pos,rs_rob_tag;
+    wire [9:0] rs_op;
+    assign IF_rd_en = !rob_isFull && !slb_isFull;
     IF _if( .clk_in(clk_in),
             .rst_in(rst_in),
             .rdy_in(rdy_in),
@@ -58,10 +68,6 @@ module cpu(input wire clk_in,
             .predict_pc_output(IF_predict_pc),
             .access_valid_output(IF_pre_access_valid)
             );
-    wire [4:0] issue_rs1,issue_rs2,issue_rd;
-    wire issue_toRS,issue_toSLB;
-    wire [9:0] issue_op;
-    wire [31:0] issue_immediate;
     Issue _issue( .instr(IF_instr),
                   .has_instr(IF_has_instr),
                   .rs1(issue_rs1),
@@ -90,6 +96,7 @@ module cpu(input wire clk_in,
                       .rdy_in(rdy_in),
                       .rs1(issue_rs1),
                       .rs2(issue_rs2),
+                      .control_hazard(control_hazard),
                       .rd_control(regfile_rd_control),
                       .rd(issue_rd),
                       .Q_value(ROB_tail),
@@ -102,10 +109,6 @@ module cpu(input wire clk_in,
                       .Q1(regfile_Q1),
                       .Q2(regfile_Q2)
     );
-    wire rs_input_valid,RS_full,has_ex_node,ex_has_result;
-    wire [31:0] rs_V1,rs_V2,rs_immediate,rs_npc;
-    wire [Q_WIDTH-1:0] ex_ROB_pos,rs_rob_tag;
-    wire [9:0] rs_op;
     Rs _rs( .clk_in(clk_in),
             .rst_in(rst_in),
             .rdy_in(rdy_in),
@@ -134,7 +137,7 @@ module cpu(input wire clk_in,
             .npc_output(rs_npc),
             .RS_Full(RS_full)
     );
-    assign rs_input_valid = !(!IF_has_instr || (!has_ex_node && Q1==0 && Q2==0));
+    assign rs_input_valid = IF_has_instr && issue_toRS && !(!has_ex_node && Q1==0 && Q2==0);
     assign ex_has_result = (has_ex_node || (IF_has_instr && issue_toRS && (Q1==0 && Q2==0)));
     assign ex_op = (has_ex_node)? rs_op : issue_op;
     assign ex_npc = (has_ex_node)? rs_npc : IF_npc;
@@ -210,7 +213,8 @@ module cpu(input wire clk_in,
                         .has_result(slb_has_result),
                         .slb_target_ROB_pos(slb_target_ROB_pos),
                         .V(slb_V),
-                        .access_valid_output(SLB_pre_access_valid)
+                        .access_valid_output(SLB_pre_access_valid),
+                        .full(slb_isFull)
     );
 
     //mem access control
@@ -236,6 +240,14 @@ module cpu(input wire clk_in,
         end
         else
         begin
+        // $display("@%b",rob_isFull);
+        // if (IF_has_instr) begin
+        //         // $display("%h",IF_instr);
+        //         // $display("%h %h %h %h",V1,V2,Q1,Q2);
+        //         if (commit_modify_regfile) begin
+        //                 $display("%h %h %h",commit_modify_regfile,commit_reg_addr,Commit_V);
+        //         end
+        // end
         //      if (IF_has_instr && issue_toSLB && issue_op[9:7]==3 && V1[17:16]==2'b11) begin
         //              $display("%h %h %h %h %h",IF_instr,issue_rs1,issue_rs2,V1,V2);
         //      end
@@ -244,5 +256,4 @@ module cpu(input wire clk_in,
         //      end
         end
     end
-    
 endmodule

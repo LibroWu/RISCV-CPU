@@ -77,57 +77,67 @@ endmodule
                 else if (!rdy_in) begin
                 
                 end else begin
-                    if (input_valid) begin
-                        Busy[empty_pos] <= 1;
-                        rob_tag[empty_pos] <= rob_tag_input;
-                        op[empty_pos] <= op_input;
-                        Q1[empty_pos] <= Q1_input;
-                        Q2[empty_pos] <= Q2_input;
-                        V1[empty_pos] <= V1_input;
-                        V2[empty_pos] <= V2_input;
-                        immediate[empty_pos] <= immediate_input;
-                        npc[empty_pos] <= npc_input;
-                        if (update_control) begin
-                            if (Q1_input == target_ROB_pos) begin
-                                Q1[empty_pos] <= 0;
-                                V1[empty_pos] <= V_ex;
+                    if (control_hazard) begin
+                        Busy <= 0 ;
+                    end else begin
+                        if (input_valid) begin
+                            Busy[empty_pos] <= 1;
+                            rob_tag[empty_pos] <= rob_tag_input;
+                            op[empty_pos] <= op_input;
+                            Q1[empty_pos] <= Q1_input;
+                            Q2[empty_pos] <= Q2_input;
+                            V1[empty_pos] <= V1_input;
+                            V2[empty_pos] <= V2_input;
+                            immediate[empty_pos] <= immediate_input;
+                            npc[empty_pos] <= npc_input;
+                            if (update_control) begin
+                                if (Q1_input == target_ROB_pos) begin
+                                    Q1[empty_pos] <= 0;
+                                    V1[empty_pos] <= V_ex;
+                                end
+                                if (Q2_input == target_ROB_pos) begin
+                                    Q2[empty_pos] <= 0;
+                                    V2[empty_pos] <= V_ex;
+                                end
                             end
-                            if (Q2_input == target_ROB_pos) begin
-                                Q2[empty_pos] <= 0;
-                                V2[empty_pos] <= V_ex;
+                            if (has_slb_result) begin
+                                if (Q1_input == slb_target_ROB_pos) begin
+                                    Q1[empty_pos] <= 0;
+                                    V1[empty_pos] <= V_slb;
+                                end
+                                if (Q2_input == slb_target_ROB_pos) begin
+                                    Q2[empty_pos] <= 0;
+                                    V2[empty_pos] <= V_slb;
+                                end
+                            end
+                        end
+                        if (update_control) begin
+                            for (j = 0; j<2**RS_WIDTH; j=j+1) begin
+                                if (Q1[j]==target_ROB_pos) begin
+                                    Q1[j] <= 0;
+                                    V1[j] <= V_ex;
+                                end
+                                if (Q2[j]==target_ROB_pos) begin
+                                    Q2[j] <= 0;
+                                    V2[j] <= V_ex;
+                                end
                             end
                         end
                         if (has_slb_result) begin
-                            if (Q1_input == slb_target_ROB_pos) begin
-                                Q1[empty_pos] <= 0;
-                                V1[empty_pos] <= V_slb;
-                            end
-                            if (Q2_input == slb_target_ROB_pos) begin
-                                Q2[empty_pos] <= 0;
-                                V2[empty_pos] <= V_slb;
-                            end
-                        end
-                    end
-                    if (update_control) begin
-                        for (j = 0; j<2**RS_WIDTH; j=j+1) begin
-                            if (Q1[j]==target_ROB_pos) begin
-                                Q1[j] <= 0;
-                                V1[j] <= V_ex;
-                            end
-                            if (Q2[j]==target_ROB_pos) begin
-                                Q2[j] <= 0;
-                                V2[j] <= V_ex;
+                            for (j = 0; j<2**RS_WIDTH; j=j+1) begin
+                                if (Q1[j]==slb_target_ROB_pos) begin
+                                    Q1[j] <= 0;
+                                    V1[j] <= V_slb;
+                                end
+                                if (Q2[j]==slb_target_ROB_pos) begin
+                                    Q2[j] <= 0;
+                                    V2[j] <= V_slb;
+                                end
                             end
                         end
-                    end
-                    if (_has_ex_node) begin
-                        _op_output <= op[exable];
-                        _V1_output <= V1[exable_pos];
-                        _V2_output <= V2[exable_pos];
-                        _npc_output <= npc[exable_pos];
-                        _immediate_output <= immediate[exable_pos];
-                        _rob_tag_output <= rob_tag[exable_pos];
-                        Busy[exable_pos] = 0;
+                        if (_has_ex_node) begin
+                            Busy[exable_pos] = 0;
+                        end
                     end
                 end
             end
@@ -149,7 +159,7 @@ endmodule
         Busy[15] == 0? 15:
         4'bxxxx
         );
-        assign RS_Full = (empty_pos===4'bxxxx)?1:0;
+        assign RS_Full = (Busy==16'hffff);
         assign exable_pos = (exable[0] == 1? 0:
         exable[1] == 1? 1:
         exable[2] == 1? 2:
@@ -168,14 +178,14 @@ endmodule
         exable[15] == 1? 15:
         4'bxxxx
         );
-        assign _has_ex_node = (exable_pos===4'bxxxx)?0:1;
+        assign _has_ex_node = exable!=16'h0000;
         assign has_ex_node = _has_ex_node;
-        assign V1_output = _V1_output;
-        assign V2_output = _V2_output;
-        assign op_output = _op_output;
-        assign immediate_output = _immediate_output;
-        assign npc_output       = _npc_output;
-        assign rob_tag_output   = _rob_tag_output;
+        assign V1_output = V1[exable_pos];
+        assign V2_output = V2[exable_pos];
+        assign op_output = op[exable_pos];
+        assign immediate_output = immediate[exable_pos];
+        assign npc_output       = npc[exable_pos];
+        assign rob_tag_output   = rob_tag[exable_pos];
         genvar i;
         generate 
         for (i = 0;i<2**RS_WIDTH;i = i+1) begin
