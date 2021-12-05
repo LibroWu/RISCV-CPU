@@ -18,6 +18,7 @@ module Rob
     
     //input from SLBuffer result
     input wire has_slb_result,
+    input wire slb_head_isStore,
     input wire [Q_WIDTH-1:0] slb_target_ROB_pos,
     input wire [31:0] V_slb,
 
@@ -106,7 +107,7 @@ module Rob
                     rob_npc[target_ROB_pos] <= pc_ex;
                     has_value[target_ROB_pos] <= 1;
                 end
-                if (has_slb_result) begin
+                if (has_slb_result || slb_head_isStore) begin
                     rob_V[slb_target_ROB_pos] <= V_slb;
                     has_value[slb_target_ROB_pos] <= 1;
                 end
@@ -129,14 +130,16 @@ module Rob
         end
     end
     wire debug;
-    assign debug = commit_modify_regfile && commit_reg_addr==1 && Commit_V==0;
+    assign debug =pre_pc_queue[q_rd_ptr] == 32'h110c && commit_modify_regfile && commit_reg_addr=='hd && Commit_V=='h30000;
+    wire [31:0] debug2;
+    assign debug2 = rob_V[7];
     // Derive "protected" read/write signals
     assign rd_en_prot = (!q_empty && has_value[q_rd_ptr]);
     assign wr_en_prot = (!q_full  && has_issue);
 
     // Handle writes.
     assign d_wr_ptr = (wr_en_prot) ? ((q_wr_ptr+1'h1==4'b0) ? 1 : q_wr_ptr + 1'h1) : q_wr_ptr;
-    assign _has_value = (wr_en_prot) ? isStore_input:has_value[q_wr_ptr];
+    assign _has_value = (wr_en_prot) ? 0:has_value[q_wr_ptr];
     assign _isStore = (wr_en_prot) ? isStore_input:isStore[q_wr_ptr];
     assign _isBranch = (wr_en_prot) ? isBranch_input: isBranch[q_wr_ptr];
     assign _rob_reg_addr = (wr_en_prot) ? reg_addr: rob_reg_addr[q_wr_ptr];

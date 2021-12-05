@@ -120,18 +120,19 @@ module IF(
                     // end
                     counter <= counter+1;
                 end
+                if (wr_en_prot) begin
+                    _pc <= predict_pc;
+                    flag     <= 1;
+                end
                 if (icache_hit) begin
                     _counter <= 0;
                     counter  <= 0;
+                    
                     flag     <= 1;
-                    _pc      <= predict_pc;
                 end
                 if (access_valid) begin
                     flag<=0;
                     _counter <= _counter + 1;
-                    if (counter==3 && _access_valid) begin
-                        _pc <= predict_pc;
-                    end
                 end
             end 
         end

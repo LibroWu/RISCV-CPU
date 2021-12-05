@@ -216,7 +216,7 @@ always @*
         endcase
       end
   end
-
+reg debug,debug2;
 always @*
   begin
     // Setup default FF updates.
@@ -240,7 +240,8 @@ always @*
 
     if (parity_err)
       d_err_code[DBG_UART_PARITY_ERR] = 1'b1;
-
+    debug<=0;
+    debug2<=0;
     if (~q_io_en & io_en) begin
       if (io_wr) begin
         case (io_sel)
@@ -248,6 +249,10 @@ always @*
             if (!tx_full && io_din!=8'h00) begin
               d_tx_data = io_din;
               d_wr_en   = 1'b1;
+            end
+            debug2<=1;
+            if (io_din=='h6d) begin
+              debug <= 1;
             end
             $write("%c", io_din);
           end

@@ -32,7 +32,7 @@ module cpu(input wire clk_in,
     wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
     wire control_hazard;
     //slb
-    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr,slb_isFull;
+    wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr,slb_isFull,slb_head_isStore;
     wire [Q_WIDTH-1:0] slb_target_ROB_pos;
     wire [31:0] slb_V,slb_mem_addr;
     wire [7:0] slb_mem_din,slb_mem_dout;
@@ -163,6 +163,7 @@ module cpu(input wire clk_in,
                .pre_pc(IF_npc),
                .predict_pc(IF_predict_pc),
                .has_slb_result(slb_has_result),
+               .slb_head_isStore(slb_head_isStore),
                .slb_target_ROB_pos(slb_target_ROB_pos),
                .V_slb(slb_V),
                .has_ex_result(ex_has_result),
@@ -214,12 +215,13 @@ module cpu(input wire clk_in,
                         .slb_target_ROB_pos(slb_target_ROB_pos),
                         .V(slb_V),
                         .access_valid_output(SLB_pre_access_valid),
-                        .full(slb_isFull)
+                        .full(slb_isFull),
+                        .head_isStore(slb_head_isStore)
     );
 
     //mem access control
     assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
-    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) && !(SLB_pre_access_valid || IF_pre_access_valid);
+    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) &&  (!slb_mem_wr || !(SLB_pre_access_valid || IF_pre_access_valid));
     assign mem_wr = (slb_access_valid && slb_mem_wr);
     assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:
@@ -240,7 +242,7 @@ module cpu(input wire clk_in,
         end
         else
         begin
-        // $display("@%b",rob_isFull);
+        // display("@%b",rob_isFull);
         // if (IF_has_instr) begin
         //         // $display("%h",IF_instr);
         //         // $display("%h %h %h %h",V1,V2,Q1,Q2);

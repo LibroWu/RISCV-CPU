@@ -50,6 +50,7 @@ module SLBuffer
     output  wire          mem_wr,          //1 for write
 
     output  wire          has_result,
+    output  wire          head_isStore,
     output  wire [Q_WIDTH-1:0] slb_target_ROB_pos,
     output  wire [31:0]   V,
     output  wire          full
@@ -312,10 +313,11 @@ module SLBuffer
     assign full      = q_full;
     assign empty     = q_empty;
     assign mem_addr  = sub_ex_module_result;
-    assign mem_wr    = access_valid && _op_tmp[9:7]==3;
+    assign mem_wr    = _op_tmp[9:7]==3;
     assign mem_dout  = V2[_q_rd_ptr][7:0];
     assign access_control = !_q_empty && exable[_q_rd_ptr];
     assign access_valid_output = _access_valid;
+    assign head_isStore = !q_empty && isStore[q_rd_ptr] && !receive_commit[q_rd_ptr];
 
     genvar i;
     generate 
