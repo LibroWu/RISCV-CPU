@@ -115,10 +115,13 @@ module Rob
                 end
             end
             // if (rd_en_prot) begin
-            //     $display("%h",pre_pc_queue[q_rd_ptr][15:0]);
+            //     $display("%h %h",pre_pc_queue[q_rd_ptr][15:0],q_rd_ptr);
             //     if (commit_modify_regfile) begin
             //         $display("reg[%0h] %0h",commit_reg_addr,Commit_V);
             //     end
+            // end
+            // if (control_hazard) begin
+            //     $display("control hazard at %h",pre_pc_queue[q_rd_ptr][15:0]);
             // end
             // $display("%b %b %b %b %b %h",control_hazard,d_empty,q_empty,wr_en_prot,isStore_input,has_value);
             // if (rd_en_prot) begin
@@ -132,7 +135,7 @@ module Rob
         end
     end
     wire debug;
-    assign debug =commit_modify_regfile && commit_reg_addr=='hf && Commit_V=='h4;
+    assign debug =commit_modify_regfile && commit_reg_addr=='hd && Commit_V=='h8;
     wire [31:0] debug2;
     assign debug2 = rob_V[7];
     // Derive "protected" read/write signals
@@ -196,5 +199,4 @@ module Rob
                 0;
     assign has_value1 = has_value[rob_pos_r1] || (has_ex_result && target_ROB_pos==rob_pos_r1) || (has_slb_result && slb_target_ROB_pos==rob_pos_r1);
     assign has_value2 = has_value[rob_pos_r2] || (has_ex_result && target_ROB_pos==rob_pos_r2) || (has_slb_result && slb_target_ROB_pos==rob_pos_r2);
-
 endmodule

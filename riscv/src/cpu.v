@@ -237,8 +237,9 @@ module cpu(input wire clk_in,
     );
 
     //mem access control
+    reg slb_pre_wr;
     assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
-    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) &&  (!slb_mem_wr || !(SLB_pre_access_valid || IF_pre_access_valid));
+    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || 1) &&  (!slb_mem_wr || !((SLB_pre_access_valid  && !slb_pre_wr) || IF_pre_access_valid));
     assign mem_wr = (slb_access_valid && slb_mem_wr);
     assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:
@@ -251,7 +252,7 @@ module cpu(input wire clk_in,
     begin
         if (rst_in)
         begin
-            
+            slb_pre_wr<=0;
         end
         else if (!rdy_in)
         begin
@@ -259,6 +260,13 @@ module cpu(input wire clk_in,
         end
         else
         begin
+             slb_pre_wr <= slb_mem_wr;
+        // if (IF_has_instr) begin
+        //         $display("IF: %h %h %h %h %h %h %h %h %h",IF_npc,IF_instr,issue_toSLB,V1,V2,Q1,Q2,issue_immediate,ROB_tail);
+        // end
+        // if (ex_has_result) begin
+        //         $display("EX: %h %h %h %h %h %h %h",ex_V1,ex_V2,ex_immediate,ex_npc,ex_V,ex_tpc,ex_ROB_pos);
+        // end
         // display("@%b",rob_isFull);
         // if (IF_has_instr) begin
         //         // $display("%h",IF_instr);

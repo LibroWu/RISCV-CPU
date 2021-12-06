@@ -95,6 +95,7 @@ module SLBuffer
     //sub_ex_module
     wire [31:0] sub_ex_1,sub_ex_2;
     wire [31:0] sub_ex_module_result;
+    reg  [31:0] debug_mem_addr;
     assign sub_ex_1 = V1[_q_rd_ptr];
     assign sub_ex_2 = immediate[_q_rd_ptr];
     assign sub_ex_module_result = sub_ex_1 + sub_ex_2;
@@ -148,6 +149,19 @@ module SLBuffer
                     has_last_commit <= 0;
                 end
             end else begin
+                // $display("V2[8]=%h",V2[8]);
+                // $display("Q2[8]=%h",Q2[8]);
+                // if (q_wr_ptr == 8) begin
+                //     $display("Q2[8] input=%h",_Q2);
+                // end
+                if (rd_en_prot) begin
+                    Q1[q_rd_ptr]             <= 0;  
+                    Q2[q_rd_ptr]             <= 0;  
+                end
+                if (_rd_en_prot) begin
+                    Q1[_q_rd_ptr]             <= 0;  
+                    Q2[_q_rd_ptr]             <= 0;  
+                end
                 q_rd_ptr                 <= d_rd_ptr;
                 _q_rd_ptr                <= _d_rd_ptr;
                 q_wr_ptr                 <= d_wr_ptr;
@@ -169,31 +183,141 @@ module SLBuffer
                     last_commit_pos <= 0;
                 end
                 if (update_control) begin
-                        for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
-                            if (Q1[j]===target_ROB_pos) begin
+                    if (wr_en_prot) begin
+                        if (_Q1==target_ROB_pos) begin
+                            Q1[q_wr_ptr] <= 0;
+                            V1[q_wr_ptr] <= V_ex;
+                        end
+                        if (_Q2==target_ROB_pos) begin
+                            Q2[q_wr_ptr] <= 0;
+                            V2[q_wr_ptr] <= V_ex;
+                        end
+                    end
+                    if (q_rd_ptr<q_wr_ptr) begin
+                        for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
+                            if (Q1[j]==target_ROB_pos) begin
                                 Q1[j] <= 0;
                                 V1[j] <= V_ex;
                             end
                             if (Q2[j]==target_ROB_pos) begin
+                                // if (j==8) begin
+                                //     $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
+                                // end
                                 Q2[j] <= 0;
                                 V2[j] <= V_ex;
                             end
                         end
+                    end else begin
+                        for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
+                            if (Q1[j]==target_ROB_pos) begin
+                                Q1[j] <= 0;
+                                V1[j] <= V_ex;
+                            end
+                            if (Q2[j]==target_ROB_pos) begin
+                                // if (j==8) begin
+                                //     $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
+                                // end
+                                Q2[j] <= 0;
+                                V2[j] <= V_ex;
+                            end
+                        end
+                        for (j = 0; j<q_wr_ptr; j=j+1) begin
+                            if (Q1[j]==target_ROB_pos) begin
+                                Q1[j] <= 0;
+                                V1[j] <= V_ex;
+                            end
+                            if (Q2[j]==target_ROB_pos) begin
+                                // if (j==8) begin
+                                //     $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
+                                // end
+                                Q2[j] <= 0;
+                                V2[j] <= V_ex;
+                            end
+                        end
+                    end
+                        // for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                        //     if (Q1[j]==target_ROB_pos) begin
+                        //         Q1[j] <= 0;
+                        //         V1[j] <= V_ex;
+                        //     end
+                        //     if (Q2[j]==target_ROB_pos) begin
+                        //         if (j==8) begin
+                        //             $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
+                        //         end
+                        //         Q2[j] <= 0;
+                        //         V2[j] <= V_ex;
+                        //     end
+                        // end
                 end
                 if (has_result) begin
-                        for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                    if (wr_en_prot) begin
+                        if (_Q1==slb_target_ROB_pos) begin
+                            Q1[q_wr_ptr] <= 0;
+                            V1[q_wr_ptr] <= V;
+                        end
+                        if (_Q2==slb_target_ROB_pos) begin
+                            Q2[q_wr_ptr] <= 0;
+                            V2[q_wr_ptr] <= V;
+                        end
+                    end
+                    if (q_rd_ptr<q_wr_ptr) begin
+                        for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
                             if (Q1[j]==slb_target_ROB_pos) begin
                                 Q1[j] <= 0;
                                 V1[j] <= V;
                             end
                             if (Q2[j]==slb_target_ROB_pos) begin
+                                // if (j==8) begin
+                                //     $display("j==8_2,update_V=%h",V_ex);
+                                // end
                                 Q2[j] <= 0;
                                 V2[j] <= V;
                             end
                         end
+                    end else begin
+                        for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
+                            if (Q1[j]==slb_target_ROB_pos) begin
+                                Q1[j] <= 0;
+                                V1[j] <= V;
+                            end
+                            if (Q2[j]==slb_target_ROB_pos) begin
+                                // if (j==8) begin
+                                //     $display("j==8_2,update_V=%h",V_ex);
+                                // end
+                                Q2[j] <= 0;
+                                V2[j] <= V;
+                            end
+                        end
+                        for (j = 0; j<q_wr_ptr; j=j+1) begin
+                            if (Q1[j]==slb_target_ROB_pos) begin
+                                Q1[j] <= 0;
+                                V1[j] <= V;
+                            end
+                            if (Q2[j]==slb_target_ROB_pos) begin
+                                // if (j==8) begin
+                                //     $display("j==8_2,update_V=%h",V_ex);
+                                // end
+                                Q2[j] <= 0;
+                                V2[j] <= V;
+                            end
+                        end
+                    end
+                        // for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                        //     if (Q1[j]==slb_target_ROB_pos) begin
+                        //         Q1[j] <= 0;
+                        //         V1[j] <= V;
+                        //     end
+                        //     if (Q2[j]==slb_target_ROB_pos) begin
+                        //         if (j==8) begin
+                        //             $display("j==8_2,update_V=%h",V_ex);
+                        //         end
+                        //         Q2[j] <= 0;
+                        //         V2[j] <= V;
+                        //     end
+                        // end
                 end
                 if (has_commit) begin
-                 if (q_rd_ptr<q_wr_ptr) begin
+                    if (q_rd_ptr<q_wr_ptr) begin
                         for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
                             if (id[j]==Commit_Q && isStore[j]) begin
                                     receive_commit[j] <= 1;
@@ -242,6 +366,13 @@ module SLBuffer
                     end else counter <= counter + 1;
                 end
             end
+            // debug_mem_addr<=mem_addr;
+            // if (mem_wr && access_valid) begin
+            //     $display("mem %h %h:write %h at %h",_q_rd_ptr,id[_q_rd_ptr],mem_dout,mem_addr);
+            // end
+            // if (_access_valid) begin
+            //     $display("mem %h %h:read %h at %h",_q_rd_ptr,id[_q_rd_ptr],mem_din,debug_mem_addr);
+            // end
         end
     end
 
