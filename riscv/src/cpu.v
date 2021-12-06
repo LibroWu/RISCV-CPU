@@ -29,8 +29,8 @@ module cpu(input wire clk_in,
     wire rob_isFull,rob_isEmpty,commit_modify_regfile,has_commit_toSLB,rob_has_value1,rob_has_value2;
     wire [Q_WIDTH-1:0] ROB_tail,Commit_Q;
     wire [REG_ADDR_WIDTH-1:0] commit_reg_addr;
-    wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2;
-    wire control_hazard;
+    wire [31:0] Commit_V,Commit_pc,rob_V1,rob_V2,Commit_pre_pc;
+    wire control_hazard,Commit_isBranch;
     //slb
     wire slb_has_result,slb_access_valid,slb_access_request,slb_mem_wr,slb_isFull,slb_head_isStore;
     wire [Q_WIDTH-1:0] slb_target_ROB_pos;
@@ -51,6 +51,9 @@ module cpu(input wire clk_in,
     wire [31:0] rs_V1,rs_V2,rs_immediate,rs_npc;
     wire [Q_WIDTH-1:0] ex_ROB_pos,rs_rob_tag;
     wire [9:0] rs_op;
+    //branch predict
+    wire predict_jump;
+    wire [31:0] predict_pc_request;
     assign IF_rd_en = !rob_isFull && !slb_isFull;
     IF _if( .clk_in(clk_in),
             .rst_in(rst_in),
@@ -66,8 +69,20 @@ module cpu(input wire clk_in,
             .instr(IF_instr),
             .npc(IF_npc),
             .predict_pc_output(IF_predict_pc),
-            .access_valid_output(IF_pre_access_valid)
+            .access_valid_output(IF_pre_access_valid),
+            .predict_jump_input(predict_jump),
+            .predict_pc_request(predict_pc_request)
             );
+    branchPredictor _branchPredictor(
+            .clk_in(clk_in),
+            .rst_in(rst_in),
+            .rdy_in(rdy_in),
+            .now_pc(predict_pc_request),
+            .update_control(Commit_isBranch),
+            .update_jump(control_hazard),
+            .update_pc(Commit_pre_pc),
+            .jump(predict_jump)
+    );
     Issue _issue( .instr(IF_instr),
                   .has_instr(IF_has_instr),
                   .rs1(issue_rs1),
@@ -183,6 +198,8 @@ module cpu(input wire clk_in,
                .Commit_V(Commit_V),
                .Commit_pc(Commit_pc),
                .control_hazard(control_hazard),
+               .pre_pc_output(Commit_pre_pc),
+               .isBranch_output(Commit_isBranch),
                .empty(rob_isEmpty),
                .full(rob_isFull),
                .ROB_tail(ROB_tail)

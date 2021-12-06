@@ -42,7 +42,9 @@ module Rob
     output  wire  [Q_WIDTH-1:0]   Commit_Q,
     output  wire  [31:0]          Commit_V,
     output  wire  [31:0]          Commit_pc,
+    output  wire  [31:0]          pre_pc_output,
     output  wire                  control_hazard,
+    output  wire                  isBranch_output,
     
     output wire                   empty,
     output wire                   full,
@@ -130,7 +132,7 @@ module Rob
         end
     end
     wire debug;
-    assign debug =pre_pc_queue[q_rd_ptr] == 32'h110c && commit_modify_regfile && commit_reg_addr=='hd && Commit_V=='h30000;
+    assign debug =commit_modify_regfile && commit_reg_addr=='hf && Commit_V=='h4;
     wire [31:0] debug2;
     assign debug2 = rob_V[7];
     // Derive "protected" read/write signals
@@ -178,6 +180,8 @@ module Rob
     assign Commit_pc = rob_npc[q_rd_ptr];
     assign commit_modify_regfile = rd_en_prot && !(isStore[q_rd_ptr] || isBranch[q_rd_ptr]);
     assign control_hazard = rd_en_prot && (isBranch[q_rd_ptr] && rob_npc[q_rd_ptr]!=rob_predict_pc[q_rd_ptr]);
+    assign isBranch_output = isBranch[q_rd_ptr];
+    assign pre_pc_output = pre_pc_queue[q_rd_ptr];
     assign full    = q_full;
     assign empty   = q_empty;
     assign ROB_tail = q_wr_ptr;

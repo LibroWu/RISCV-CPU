@@ -7,6 +7,10 @@ module IF(
     input   wire          control_hazard,
     input   wire [31:0]        Commit_pc,
 
+    //predict
+    input   wire          predict_jump_input,
+    output  wire [31:0]   predict_pc_request,
+
     //1 if ROB is not full
     //in my design, ROB is the same capacity as RS
     input   wire          rd_en,
@@ -49,7 +53,7 @@ module IF(
     //implement as static predict except JAL
     wire [31:0] immediate; 
     wire predict_jump;
-    assign predict_jump = 1'b0;
+    assign predict_jump = predict_jump_input;
     wire [31:0] predict_pc;
     assign immediate = (icache_hit)? ((icache_instr[6:0]==7'b1101111)?{{12{icache_instr[31]}},icache_instr[19:12],icache_instr[20],icache_instr[30:21],1'b0}:
                        (icache_instr[6:0]==7'b1100011 && predict_jump)?{{20{icache_instr[31]}},icache_instr[7],icache_instr[30:25],icache_instr[11:8],1'b0}:4):
@@ -187,6 +191,7 @@ module IF(
     assign access_control = !icache_hit && !stall && !q_full;
     assign access_valid_output = _access_valid;
     assign mem_addr  = predict_pc;
+    assign predict_pc_request = _pc;
 
     icache _icache( .clk_in(clk_in),
                     .rst_in(rst_in),

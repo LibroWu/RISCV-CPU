@@ -113,11 +113,11 @@ endmodule
                         end
                         if (update_control) begin
                             for (j = 0; j<2**RS_WIDTH; j=j+1) begin
-                                if (Q1[j]==target_ROB_pos) begin
+                                if (Busy[j] && Q1[j]==target_ROB_pos) begin
                                     Q1[j] <= 0;
                                     V1[j] <= V_ex;
                                 end
-                                if (Q2[j]==target_ROB_pos) begin
+                                if (Busy[j] && Q2[j]==target_ROB_pos) begin
                                     Q2[j] <= 0;
                                     V2[j] <= V_ex;
                                 end
@@ -125,11 +125,11 @@ endmodule
                         end
                         if (has_slb_result) begin
                             for (j = 0; j<2**RS_WIDTH; j=j+1) begin
-                                if (Q1[j]==slb_target_ROB_pos) begin
+                                if (Busy[j] && Q1[j]==slb_target_ROB_pos) begin
                                     Q1[j] <= 0;
                                     V1[j] <= V_slb;
                                 end
-                                if (Q2[j]==slb_target_ROB_pos) begin
+                                if (Busy[j] && Q2[j]==slb_target_ROB_pos) begin
                                     Q2[j] <= 0;
                                     V2[j] <= V_slb;
                                 end
