@@ -49,6 +49,10 @@ module regfile
                 for (i = 0;i<2**REG_ADDR_WIDTH;i = i+1) begin
                     Q[i] <= 0;
                 end
+                if (has_commit && commit_target!=0) begin
+                    //$display("%h %h",commit_target,Commit_V);
+                    regs[commit_target] <= Commit_V;
+                end
             end else begin
                 //$display("%h",regs[31]);
                 if (has_commit && commit_target!=0) begin

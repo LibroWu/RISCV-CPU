@@ -7,8 +7,8 @@ module testbench;
 reg clk;
 reg rst;
     initial begin
-        $dumpfile("cpu_______.vcd");
-        $dumpvars(0,testbench);
+        //$dumpfile("cpu_______.vcd");
+        //$dumpvars(0,testbench);
         //#300000000 $finish;
     end
 riscv_top #(.SIM(1)) top(
