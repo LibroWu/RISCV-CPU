@@ -1,6 +1,6 @@
 module branchPredictor
 #(
-    parameter  PREDICTOR_WIDTH=12,
+    parameter  PREDICTOR_WIDTH=6,
     parameter  HISTORY_WIDTH = 2
 )
 (

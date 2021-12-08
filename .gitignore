@@ -6,3 +6,4 @@ test*
 riscv/sim/*
 riscv/data*
 riscv/gendata*
+serial

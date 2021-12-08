@@ -193,46 +193,16 @@ module SLBuffer
                             V2[q_wr_ptr] <= V_ex;
                         end
                     end
-                    if (q_rd_ptr<q_wr_ptr) begin
-                        for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
+                    for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                        if ((q_rd_ptr<q_wr_ptr && q_rd_ptr<=j && j<q_wr_ptr) || ((q_wr_ptr<q_rd_ptr || q_full) && (j <q_wr_ptr || q_rd_ptr<=j))) begin
                             if (Q1[j]==target_ROB_pos) begin
                                 Q1[j] <= 0;
                                 V1[j] <= V_ex;
                             end
                             if (Q2[j]==target_ROB_pos) begin
-                                // if (j==8) begin
-                                //     $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
-                                // end
                                 Q2[j] <= 0;
                                 V2[j] <= V_ex;
-                            end
-                        end
-                    end else begin
-                        for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
-                            if (Q1[j]==target_ROB_pos) begin
-                                Q1[j] <= 0;
-                                V1[j] <= V_ex;
-                            end
-                            if (Q2[j]==target_ROB_pos) begin
-                                // if (j==8) begin
-                                //     $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
-                                // end
-                                Q2[j] <= 0;
-                                V2[j] <= V_ex;
-                            end
-                        end
-                        for (j = 0; j<q_wr_ptr; j=j+1) begin
-                            if (Q1[j]==target_ROB_pos) begin
-                                Q1[j] <= 0;
-                                V1[j] <= V_ex;
-                            end
-                            if (Q2[j]==target_ROB_pos) begin
-                                // if (j==8) begin
-                                //     $display("j==8_1,update_V=%h, Q2[8] %h target_ROB_pos %h",V_ex,Q2[8],target_ROB_pos);
-                                // end
-                                Q2[j] <= 0;
-                                V2[j] <= V_ex;
-                            end
+                            end                            
                         end
                     end
                         // for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
@@ -260,46 +230,16 @@ module SLBuffer
                             V2[q_wr_ptr] <= V;
                         end
                     end
-                    if (q_rd_ptr<q_wr_ptr) begin
-                        for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
+                    for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                        if ((q_rd_ptr<q_wr_ptr && q_rd_ptr<=j && j<q_wr_ptr) || ((q_wr_ptr<q_rd_ptr || q_full) && (j <q_wr_ptr || q_rd_ptr<=j))) begin
                             if (Q1[j]==slb_target_ROB_pos) begin
                                 Q1[j] <= 0;
                                 V1[j] <= V;
                             end
                             if (Q2[j]==slb_target_ROB_pos) begin
-                                // if (j==8) begin
-                                //     $display("j==8_2,update_V=%h",V_ex);
-                                // end
                                 Q2[j] <= 0;
                                 V2[j] <= V;
-                            end
-                        end
-                    end else begin
-                        for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
-                            if (Q1[j]==slb_target_ROB_pos) begin
-                                Q1[j] <= 0;
-                                V1[j] <= V;
-                            end
-                            if (Q2[j]==slb_target_ROB_pos) begin
-                                // if (j==8) begin
-                                //     $display("j==8_2,update_V=%h",V_ex);
-                                // end
-                                Q2[j] <= 0;
-                                V2[j] <= V;
-                            end
-                        end
-                        for (j = 0; j<q_wr_ptr; j=j+1) begin
-                            if (Q1[j]==slb_target_ROB_pos) begin
-                                Q1[j] <= 0;
-                                V1[j] <= V;
-                            end
-                            if (Q2[j]==slb_target_ROB_pos) begin
-                                // if (j==8) begin
-                                //     $display("j==8_2,update_V=%h",V_ex);
-                                // end
-                                Q2[j] <= 0;
-                                V2[j] <= V;
-                            end
+                            end                    
                         end
                     end
                         // for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
@@ -317,28 +257,13 @@ module SLBuffer
                         // end
                 end
                 if (has_commit) begin
-                    if (q_rd_ptr<q_wr_ptr) begin
-                        for (j = q_rd_ptr; j<q_wr_ptr; j=j+1) begin
+                    for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
+                        if ((q_rd_ptr<q_wr_ptr && q_rd_ptr<=j && j<q_wr_ptr) || ((q_wr_ptr<q_rd_ptr || q_full) && (j <q_wr_ptr || q_rd_ptr<=j))) begin
                             if (id[j]==Commit_Q && isStore[j]) begin
                                     receive_commit[j] <= 1;
                                     last_commit_pos <= j;
                                     has_last_commit <= 1;
-                                end
-                        end
-                    end else begin
-                        for (j = q_rd_ptr; j<2**SLB_WIDTH; j=j+1) begin
-                            if (id[j]==Commit_Q && isStore[j]) begin
-                                    receive_commit[j] <= 1;
-                                    last_commit_pos <= j;
-                                    has_last_commit <= 1;
-                                end
-                        end
-                        for (j = 0; j<q_wr_ptr; j=j+1) begin
-                             if (id[j]==Commit_Q && isStore[j]) begin
-                                    receive_commit[j] <= 1;
-                                    last_commit_pos <= j;
-                                    has_last_commit <= 1;
-                                end
+                                end                 
                         end
                     end
                     // for (j = 0; j<2**SLB_WIDTH ; j=j+1) begin
