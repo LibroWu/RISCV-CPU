@@ -152,8 +152,8 @@ module cpu(input wire clk_in,
             .npc_output(rs_npc),
             .RS_Full(RS_full)
     );
-    assign rs_input_valid = IF_has_instr && issue_toRS && !(!has_ex_node && Q1==0 && Q2==0);
-    assign ex_has_result = (has_ex_node || (IF_has_instr && issue_toRS && (Q1==0 && Q2==0)));
+    assign rs_input_valid = IF_has_instr && issue_toRS;
+    assign ex_has_result = has_ex_node;//(has_ex_node || (IF_has_instr && issue_toRS && (Q1==0 && Q2==0)));
     assign ex_op = (has_ex_node)? rs_op : issue_op;
     assign ex_npc = (has_ex_node)? rs_npc : IF_npc;
     assign ex_V1 = (has_ex_node)? rs_V1 : V1;
