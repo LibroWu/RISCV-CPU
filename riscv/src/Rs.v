@@ -136,7 +136,7 @@ endmodule
                             end
                         end
                         if (_has_ex_node) begin
-                            Busy[exable_pos] = 0;
+                            Busy[exable_pos] <= 0;
                         end
                     end
                 end

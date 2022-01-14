@@ -37,11 +37,12 @@ module IF(
     wire                 d_full;
 
     reg [31:0] instr_queue [15:0],pc_que[15:0],predict_pc_queue[15:0];
-    wire [31:0] _instr,instr_tmp;
+    wire [31:0] _instr;
+    reg [31:0] instr_tmp;
     reg [31:0] _pc;
     wire [31:0] _pc_preserve,_predict_pc_queue;
     reg [1:0] counter,_counter;
-    reg _access_valid;
+    reg _access_valid,carryUp;
     wire rd_en_prot;
     wire wr_en_prot;
     reg stall,flag;
@@ -57,7 +58,7 @@ module IF(
     wire [31:0] predict_pc;
     assign immediate = (icache_hit)? ((icache_instr[6:0]==7'b1101111)?{{12{icache_instr[31]}},icache_instr[19:12],icache_instr[20],icache_instr[30:21],1'b0}:
                        (icache_instr[6:0]==7'b1100011 && predict_jump)?{{20{icache_instr[31]}},icache_instr[7],icache_instr[30:25],icache_instr[11:8],1'b0}:4):
-                       (flag || _counter!=0) ? {30'b0,_counter}:
+                       (!carryUp) ? {30'b0,_counter}:
                        (instr_tmp[6:0]==7'b1101111)?{{12{instr_tmp[31]}},instr_tmp[19:12],instr_tmp[20],instr_tmp[30:21],1'b0}:
                        (instr_tmp[6:0]==7'b1100011 && predict_jump)?{{20{instr_tmp[31]}},instr_tmp[7],instr_tmp[30:25],instr_tmp[11:8],1'b0}:
                        4;
@@ -66,6 +67,7 @@ module IF(
     integer j;
     always @(posedge clk_in) begin
         if (rst_in) begin
+            carryUp <= 0;
             stall <= 0;
             flag  <= 1;
             _access_valid <= 0;
@@ -87,8 +89,9 @@ module IF(
         end else begin
             if (control_hazard) begin
                 stall <= 0;
+                carryUp <= 0;
                 _access_valid <= 0;
-                flag<= 1;
+                flag <= 1;
                 _pc <= Commit_pc;
                 counter<=0;
                 _counter <= 0;
@@ -102,6 +105,7 @@ module IF(
                     predict_pc_queue[j] <= 0;
                 end
             end else begin
+                carryUp  <= 0;
                 q_full   <= d_full;
                 q_empty  <= d_empty;
                 q_wr_ptr <= d_wr_ptr;
@@ -122,16 +126,21 @@ module IF(
                     // end else begin
                     //   instr_tmp <= instr_tmp<<8 | {24'b0,mem_din};
                     // end
+                    if (counter==0) instr_tmp[7:0] <= mem_din;
+                    if (counter==1) instr_tmp[15:8] <= mem_din;
+                    if (counter==2) instr_tmp[23:16] <= mem_din; 
+                    if (counter==3) begin
+                        instr_tmp[31:24] <= mem_din;
+                        carryUp <= 1;
+                    end
                     counter <= counter+1;
                 end
-                if (wr_en_prot) begin
+                if (carryUp||icache_hit) begin
                     _pc <= predict_pc;
-                    flag     <= 1;
                 end
                 if (icache_hit) begin
                     _counter <= 0;
                     counter  <= 0;
-                    
                     flag     <= 1;
                 end
                 if (access_valid) begin
@@ -142,10 +151,10 @@ module IF(
         end
     end
 
-    assign instr_tmp[7:0] = (counter==0)? mem_din:instr_tmp[7:0];
-    assign instr_tmp[15:8] = (counter==1)? mem_din:instr_tmp[15:8];
-    assign instr_tmp[23:16] = (counter==2)? mem_din:instr_tmp[23:16];
-    assign instr_tmp[31:24] = (counter==3)? mem_din:instr_tmp[31:24];
+    // assign instr_tmp[7:0] = (counter==0)? mem_din:instr_tmp[7:0];
+    // assign instr_tmp[15:8] = (counter==1)? mem_din:instr_tmp[15:8];
+    // assign instr_tmp[23:16] = (counter==2)? mem_din:instr_tmp[23:16];
+    // assign instr_tmp[31:24] = (counter==3)? mem_din:instr_tmp[31:24];
 
     // always @(*) begin
     //     if (counter==1) instr_tmp[7:0] = mem_din;
@@ -155,7 +164,7 @@ module IF(
     // end
     // Derive "protected" read/write signals.
     assign rd_en_prot = (rd_en && !q_empty);
-    assign wr_en_prot = (( icache_hit || counter==3 && _access_valid ) && !q_full);
+    assign wr_en_prot = (( icache_hit || carryUp ) && !q_full);
 
     // Handle writes.
     assign d_wr_ptr = (wr_en_prot)  ? q_wr_ptr + 1'h1 : q_wr_ptr;
@@ -188,7 +197,7 @@ module IF(
     assign has_instr = rd_en_prot;
     assign full      = q_full;
     assign empty     = q_empty;
-    assign access_control = !icache_hit && !stall && !q_full;
+    assign access_control = !icache_hit && !stall && !q_full && !(counter == 3 && _access_valid);
     assign access_valid_output = _access_valid;
     assign mem_addr  = predict_pc;
     assign predict_pc_request = _pc;
@@ -197,7 +206,7 @@ module IF(
                     .rst_in(rst_in),
                     .rdy_in(rdy_in),
                     .input_valid(wr_en_prot),
-                    .request_valid(!q_full && counter==0),
+                    .request_valid(!q_full && (carryUp || flag)),
                     .pc_update(_pc_preserve),
                     .instr_update(_instr),
                     .pc_request(_pc),
