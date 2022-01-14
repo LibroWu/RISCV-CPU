@@ -251,7 +251,7 @@ always @*
               d_wr_en   = 1'b1;
             end
             debug2<=1;
-            if (io_din=='h6d) begin
+            if (io_din=='h0a) begin
               debug <= 1;
             end
             $write("%c", io_din);

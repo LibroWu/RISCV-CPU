@@ -239,7 +239,7 @@ module cpu(input wire clk_in,
     //mem access control
     reg slb_pre_wr;
     assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
-    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !0) &&  (!slb_mem_wr || !((SLB_pre_access_valid  && !slb_pre_wr) || IF_pre_access_valid));
+    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) &&  (!slb_mem_wr || !((SLB_pre_access_valid  && !slb_pre_wr) || IF_pre_access_valid));
     assign mem_wr = (slb_access_valid && slb_mem_wr);
     assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:
