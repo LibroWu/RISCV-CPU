@@ -73,32 +73,28 @@ module SLBuffer
     wire [3:0] _d_rd_ptr;
     reg  [3:0] q_wr_ptr;
     wire [3:0] d_wr_ptr;
-    wire [1:0] target_counter,_target_counter;
-    reg  [1:0] counter,_counter;
+    wire [1:0] target_counter;
+    reg  [1:0] counter;
     reg [SLB_WIDTH-1:0] last_commit_pos;
     wire [SLB_WIDTH-1:0] _last_commit_pos;
     reg has_last_commit;
     reg         q_empty;
     wire        d_empty;
-    reg        _q_empty;
-    wire       _d_empty;
     reg          q_full;
     wire         d_full;
-    reg         _q_full;
-    wire        _d_full;
     wire     rd_en_prot;
-    wire    _rd_en_prot;
     wire     wr_en_prot;
     wire          fetch;
     reg   _access_valid;
     reg           rd_en;
+    wire [9:0] op_tmp;
 
     //sub_ex_module
     wire [31:0] sub_ex_1,sub_ex_2;
     wire [31:0] sub_ex_module_result;
     reg  [31:0] debug_mem_addr;
-    assign sub_ex_1 = V1[_q_rd_ptr];
-    assign sub_ex_2 = immediate[_q_rd_ptr];
+    assign sub_ex_1 = V1[q_rd_ptr];
+    assign sub_ex_2 = immediate[q_rd_ptr];
     assign sub_ex_module_result = sub_ex_1 + sub_ex_2;
 
     integer j;
@@ -112,11 +108,8 @@ module SLBuffer
             _q_rd_ptr     <= 0;
             q_empty       <= 1'b1;
             q_full        <= 1'b0;
-            _q_empty      <= 1'b1;
-            _q_full       <= 1'b0;
             _access_valid <= 1'b0;
             counter       <= 0;
-            _counter      <= 0;
             isStore       <= 0;
             receive_commit    <= 0;
             for (j = 0; j<2**SLB_WIDTH; j=j+1) begin
@@ -138,11 +131,8 @@ module SLBuffer
                     _q_rd_ptr     <= 0;
                     q_empty       <= 1'b1;
                     q_full        <= 1'b0;
-                    _q_empty      <= 1'b1;
-                    _q_full       <= 1'b0;
                     _access_valid <= 1'b0;
                     counter       <= 0;
-                    _counter      <= 0;
                     isStore       <= 0;
                     receive_commit <= 0;
                     rd_en         <= 0;
@@ -161,17 +151,10 @@ module SLBuffer
                     Q1[q_rd_ptr]             <= 0;  
                     Q2[q_rd_ptr]             <= 0;  
                 end
-                if (_rd_en_prot) begin
-                    Q1[_q_rd_ptr]             <= 0;  
-                    Q2[_q_rd_ptr]             <= 0;  
-                end
                 q_rd_ptr                 <= d_rd_ptr;
-                _q_rd_ptr                <= _d_rd_ptr;
                 q_wr_ptr                 <= d_wr_ptr;
                 q_empty                  <= d_empty;
                 q_full                   <= d_full;
-                _q_empty                 <= _d_empty;
-                _q_full                  <= _d_full;
                 Q1[q_wr_ptr]             <= _Q1;
                 Q2[q_wr_ptr]             <= _Q2;
                 V1[q_wr_ptr]             <= _V1;
@@ -181,7 +164,7 @@ module SLBuffer
                 id[q_wr_ptr]             <= _id;
                 isStore[q_wr_ptr]        <= _isStore;
                 receive_commit[q_wr_ptr] <= _receive_commit;
-                if (_rd_en_prot && has_last_commit && last_commit_pos==_q_rd_ptr) begin
+                if (rd_en_prot && has_last_commit && last_commit_pos==q_rd_ptr) begin
                     has_last_commit <= 0;
                     last_commit_pos <= 0;
                 end
@@ -278,38 +261,32 @@ module SLBuffer
                     // end
                 end
                 if (access_valid) begin
-                    if (_counter == _target_counter) begin
-                        _counter <= 0;
-                    end else begin
-                        V1[_q_rd_ptr] <= sub_ex_module_result;
-                        V2[_q_rd_ptr] <= V2[_q_rd_ptr] >> 8;
-                        immediate[_q_rd_ptr] <= 1;
-                        _counter <= _counter + 1;
-                    end
+                    V1[q_rd_ptr] <= sub_ex_module_result;
+                    V2[q_rd_ptr] <= V2[q_rd_ptr] >> 8;
+                    immediate[q_rd_ptr] <= 1;
                 end
                 rd_en <= 0;
-                if (access_valid && mem_wr) begin
-                    _access_valid <= 0;
-                    if (counter==0) V_tmp[7:0]   <= mem_din;
-                    if (counter==1) V_tmp[15:8]  <= mem_din;
-                    if (counter==2) V_tmp[23:16] <= mem_din;
-                    if (counter==3) V_tmp[31:24] <= mem_din;
-                    counter <= counter + 1;
-                    if (counter==target_counter) begin
-                        counter <= 0;
-                        rd_en   <= 1;
+                _access_valid <= access_valid;
+                if (mem_wr) begin
+                    if (access_valid) begin
+                        _access_valid <= 0;
+                        counter <= counter + 1;
+                        if (counter==target_counter) begin
+                            counter <= 0;
+                        end
                     end
-                end else _access_valid <= access_valid;
-                if (_access_valid) begin
-                    if (counter==0) V_tmp[7:0]   <= mem_din;
-                    if (counter==1) V_tmp[15:8]  <= mem_din;
-                    if (counter==2) V_tmp[23:16] <= mem_din;
-                    if (counter==3) V_tmp[31:24] <= mem_din;
-                    counter <= counter + 1;
-                    if (counter==target_counter) begin
-                        counter <= 0;
-                        rd_en   <= 1;
-                    end 
+                end else begin
+                    if (_access_valid) begin
+                        if (counter==0) V_tmp[7:0]   <= mem_din;
+                        if (counter==1) V_tmp[15:8]  <= mem_din;
+                        if (counter==2) V_tmp[23:16] <= mem_din;
+                        if (counter==3) V_tmp[31:24] <= mem_din;
+                        counter <= counter + 1;
+                        if (counter==target_counter) begin
+                            counter <= 0;
+                            rd_en   <= 1;
+                        end
+                    end
                 end
             end
             // debug_mem_addr<=mem_addr;
@@ -325,8 +302,7 @@ module SLBuffer
     assign _last_commit_pos = last_commit_pos + 1;
 
     // Derive "protected" read/write signals.
-    assign _rd_en_prot    = (access_valid && _counter==_target_counter && !_q_empty);
-    assign rd_en_prot     = (rd_en && !q_empty);
+    assign rd_en_prot     = (((access_valid && mem_wr && counter==target_counter) || rd_en) && !q_empty);
     assign wr_en_prot     = (input_valid && !q_full);
     
     // Handle writes.
@@ -343,7 +319,6 @@ module SLBuffer
 
     // Handle reads.
     assign d_rd_ptr = (rd_en_prot)  ? q_rd_ptr + 1'h1 : q_rd_ptr;
-    assign _d_rd_ptr = (_rd_en_prot) ? _q_rd_ptr + 1'h1 : _q_rd_ptr;
     wire [3:0] addr_bits_wide_1;
     assign addr_bits_wide_1 = 1;
 
@@ -352,23 +327,17 @@ module SLBuffer
     //   2) We had one entry and there was a read.
     assign d_empty = ((q_empty && !wr_en_prot) ||
                     (((q_wr_ptr - q_rd_ptr) == addr_bits_wide_1) && rd_en_prot && !wr_en_prot));
-    assign _d_empty = ((_q_empty && !wr_en_prot) ||
-                    (((q_wr_ptr - _q_rd_ptr) == addr_bits_wide_1) && _rd_en_prot && !wr_en_prot));
 
     // Detect full state:
     //   1) We were full before and there was no read.
     //   2) We had n-1 entries and there was a write.
     assign d_full  = ((q_full && !rd_en_prot) ||
                     (((q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot && !rd_en_prot));
-    assign _d_full  = ((_q_full && !_rd_en_prot) ||
-                    (((_q_rd_ptr - q_wr_ptr) == addr_bits_wide_1) && wr_en_prot && !_rd_en_prot));
-    
+
     // Assign output signals to appropriate FFs.
     assign has_result = (rd_en_prot && !isStore[q_rd_ptr]);
     assign slb_target_ROB_pos = id[q_rd_ptr];
-    wire [9:0] op_tmp,_op_tmp;
     assign op_tmp = op[q_rd_ptr];
-    assign _op_tmp = op[_q_rd_ptr];
     // assign V_tmp[7:0] = (counter==0)? mem_din:V_tmp[7:0];
     // assign V_tmp[15:8] = (counter==1)? mem_din:V_tmp[15:8];
     // assign V_tmp[23:16] = (counter==2)? mem_din:V_tmp[23:16];
@@ -377,10 +346,6 @@ module SLBuffer
                             (op_tmp[1:0]==1)? 1:
                             (op_tmp[1:0]==2)? 3:
                             0;
-    assign _target_counter = (_op_tmp[1:0]==0)? 0:
-                             (_op_tmp[1:0]==1)? 1:
-                             (_op_tmp[1:0]==2)? 3:
-                             0;
     assign V = (op_tmp[2:0]==0)?   {{25{V_tmp[7]}},V_tmp[6:0]}:
                (op_tmp[2:0]==1)? {{17{V_tmp[15]}},V_tmp[14:0]}:
                (op_tmp[2:0]==2)?                         V_tmp:
@@ -390,9 +355,9 @@ module SLBuffer
     assign full      = q_full;
     assign empty     = q_empty;
     assign mem_addr  = sub_ex_module_result;
-    assign mem_wr    = _op_tmp[9:7]==3;
-    assign mem_dout  = V2[_q_rd_ptr][7:0];
-    assign access_control = !_q_empty && exable[_q_rd_ptr];
+    assign mem_wr    = op_tmp[9:7]==3;
+    assign mem_dout  = V2[q_rd_ptr][7:0];
+    assign access_control = !q_empty && exable[q_rd_ptr] && !((!mem_wr && _access_valid && counter==target_counter) || rd_en);
     assign access_valid_output = _access_valid;
     assign head_isStore = !q_empty && isStore[q_rd_ptr] && !receive_commit[q_rd_ptr];
 
