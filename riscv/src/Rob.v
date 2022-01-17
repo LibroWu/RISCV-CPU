@@ -12,6 +12,7 @@ module Rob
     input wire has_issue,
     input wire isStore_input,
     input wire isBranch_input,
+    input wire isMem_input,
     input wire [REG_ADDR_WIDTH-1:0] reg_addr,
     input wire [31:0] pre_pc,
     input wire [31:0] predict_pc,
@@ -45,6 +46,7 @@ module Rob
     output  wire  [31:0]          pre_pc_output,
     output  wire                  control_hazard,
     output  wire                  isBranch_output,
+    output  wire                  isMem_output,
     
     output wire                   empty,
     output wire                   full,
@@ -67,8 +69,8 @@ module Rob
     reg [REG_ADDR_WIDTH-1:0] rob_reg_addr [2**Q_WIDTH-1:0];
     reg [31:0] rob_V [2**Q_WIDTH-1:0];
     reg [31:0] rob_npc [2**Q_WIDTH-1:0],rob_predict_pc[2**Q_WIDTH-1:0],pre_pc_queue[2**Q_WIDTH-1:0];
-    reg [2**Q_WIDTH-1:0] has_value,isStore,isBranch;
-    wire _has_value,_isStore,_isBranch;
+    reg [2**Q_WIDTH-1:0] has_value,isStore,isBranch,isMem;
+    wire _has_value,_isStore,_isBranch,_isMem;
     wire [REG_ADDR_WIDTH-1:0] _rob_reg_addr;
     wire [31:0] _rob_predict_pc,_pre_pc_queue;
     integer j;
@@ -81,6 +83,7 @@ module Rob
             has_value <= 0;
             isBranch  <= 0;
             isStore   <= 0;
+            isMem     <= 0;
         end
         else if (!rdy_in) begin
             
@@ -93,6 +96,7 @@ module Rob
                 has_value <= 0;
                 isBranch  <= 0;
                 isStore   <= 0;
+                isMem     <= 0;
             end else begin
                 q_rd_ptr            <= d_rd_ptr;
                 q_wr_ptr            <= d_wr_ptr;
@@ -102,6 +106,7 @@ module Rob
                 has_value[q_wr_ptr] <= _has_value;
                 isBranch[q_wr_ptr] <= _isBranch;
                 isStore[q_wr_ptr] <= _isStore;
+                isMem[q_wr_ptr] <= _isMem;
                 rob_predict_pc[q_wr_ptr] <= _rob_predict_pc;
                 pre_pc_queue[q_wr_ptr] <= _pre_pc_queue;
                 if (has_ex_result) begin
@@ -146,6 +151,7 @@ module Rob
     assign d_wr_ptr = (wr_en_prot) ? ((q_wr_ptr+1'h1==4'b0) ? 1 : q_wr_ptr + 1'h1) : q_wr_ptr;
     assign _has_value = (wr_en_prot) ? 0:has_value[q_wr_ptr];
     assign _isStore = (wr_en_prot) ? isStore_input:isStore[q_wr_ptr];
+    assign _isMem = (wr_en_prot) ? isMem_input:isMem[q_wr_ptr];
     assign _isBranch = (wr_en_prot) ? isBranch_input: isBranch[q_wr_ptr];
     assign _rob_reg_addr = (wr_en_prot) ? reg_addr: rob_reg_addr[q_wr_ptr];
     assign _rob_predict_pc = (wr_en_prot) ? predict_pc: rob_predict_pc[q_wr_ptr];
@@ -184,6 +190,7 @@ module Rob
     assign commit_modify_regfile = rd_en_prot && !(isStore[q_rd_ptr] || isBranch[q_rd_ptr]);
     assign control_hazard = rd_en_prot && (isBranch[q_rd_ptr] && rob_npc[q_rd_ptr]!=rob_predict_pc[q_rd_ptr]);
     assign isBranch_output = isBranch[q_rd_ptr];
+    assign isMem_output = isMem[q_rd_ptr];
     assign pre_pc_output = pre_pc_queue[q_rd_ptr];
     assign full    = q_full;
     assign empty   = q_empty;

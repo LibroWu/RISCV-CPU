@@ -37,6 +37,7 @@ module SLBuffer
     
     //commit
     input  wire                  has_commit,
+    input  wire                  has_signal,
     input  wire  [Q_WIDTH-1:0]   Commit_Q,
     input  wire  [31:0]          Commit_V,
     
@@ -357,7 +358,7 @@ module SLBuffer
     assign mem_addr  = sub_ex_module_result;
     assign mem_wr    = op_tmp[9:7]==3;
     assign mem_dout  = V2[q_rd_ptr][7:0];
-    assign access_control = !q_empty && exable[q_rd_ptr] && !((!mem_wr && _access_valid && counter==target_counter) || rd_en);
+    assign access_control = !q_empty && exable[q_rd_ptr] && !((!mem_wr && _access_valid && counter==target_counter) || rd_en) && (mem_wr || V1[q_rd_ptr][17:16]!=2'b11 || has_signal);
     assign access_valid_output = _access_valid;
     assign head_isStore = !q_empty && isStore[q_rd_ptr] && !receive_commit[q_rd_ptr];
 

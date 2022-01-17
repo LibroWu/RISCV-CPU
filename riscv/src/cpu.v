@@ -54,6 +54,7 @@ module cpu(input wire clk_in,
     //branch predict
     wire predict_jump;
     wire [31:0] predict_pc_request;
+    wire robHeadIsMem;
     assign IF_rd_en = !rob_isFull && !slb_isFull;
     IF _if( .clk_in(clk_in),
             .rst_in(rst_in),
@@ -173,6 +174,7 @@ module cpu(input wire clk_in,
                .rst_in(rst_in),
                .rdy_in(rdy_in),
                .has_issue(IF_has_instr),
+               .isMem_input(IF_has_instr && issue_toSLB),
                .isStore_input(issue_op[9:7]==3),
                .isBranch_input(issue_op[9:7]==4 || IF_instr[6:0]==7'b1100111),
                .reg_addr(issue_rd),
@@ -201,6 +203,7 @@ module cpu(input wire clk_in,
                .control_hazard(control_hazard),
                .pre_pc_output(Commit_pre_pc),
                .isBranch_output(Commit_isBranch),
+               .isMem_output(robHeadIsMem),
                .empty(rob_isEmpty),
                .full(rob_isFull),
                .ROB_tail(ROB_tail)
@@ -221,6 +224,7 @@ module cpu(input wire clk_in,
                         .target_ROB_pos(ex_ROB_pos),
                         .V_ex(ex_V),
                         .has_commit(has_commit_toSLB),
+                        .has_signal(robHeadIsMem),
                         .Commit_Q(Commit_Q),
                         .Commit_V(Commit_V),
                         .access_valid(slb_access_valid),
