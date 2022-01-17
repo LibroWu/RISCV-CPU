@@ -160,7 +160,8 @@ module cpu(input wire clk_in,
     assign ex_V2 = (has_ex_node)? rs_V2 : V2;
     assign ex_immediate = (has_ex_node)? rs_immediate : issue_immediate;
     assign ex_ROB_pos = (has_ex_node) ? rs_rob_tag : ROB_tail;  
-    EX _ex( .op(ex_op),
+    EX _ex( .rst(rst_in),
+            .op(ex_op),
             .V1(ex_V1),
             .V2(ex_V2),
             .immediate(ex_immediate),
@@ -237,13 +238,15 @@ module cpu(input wire clk_in,
     );
 
     //mem access control
-    reg slb_pre_wr,_SLB_pre_access_valid;
-    assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3);
-    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || !io_buffer_full) &&  (!slb_mem_wr || !((_SLB_pre_access_valid && !slb_pre_wr) || IF_pre_access_valid));
+    reg slb_pre_wr,_SLB_pre_access_valid,pre_io_read;
+    reg [31:0] pre_addr;
+    assign IF_access_valid = !slb_access_request && IF_access_request && (!slb_access_request || slb_mem_addr[17:16]!=3) && !pre_io_read;
+    assign slb_access_valid = slb_access_request && (slb_mem_addr[17:16]!=3 || (!io_buffer_full && !((_SLB_pre_access_valid && !slb_pre_wr) || IF_pre_access_valid))) &&  (!slb_mem_wr || !((_SLB_pre_access_valid && !slb_pre_wr) || IF_pre_access_valid)) && !pre_io_read;
     assign mem_wr = (slb_access_valid && slb_mem_wr);
     assign mem_a = (IF_access_valid) ? IF_mem_addr:
                       (slb_access_valid) ? slb_mem_addr:
-                      0;
+                      (pre_io_read)?pre_addr:
+                       0;
     assign mem_dout = slb_mem_dout;
     assign slb_mem_din = mem_din;
     assign IF_mem_din = mem_din;
@@ -252,8 +255,10 @@ module cpu(input wire clk_in,
     begin
         if (rst_in)
         begin
+            pre_io_read <= 0;
             slb_pre_wr<=0;
             _SLB_pre_access_valid <= 0;
+            pre_addr <= 0;
         end
         else if (!rdy_in)
         begin
@@ -263,6 +268,8 @@ module cpu(input wire clk_in,
         begin
              slb_pre_wr <= slb_mem_wr;
              _SLB_pre_access_valid <= slb_access_valid;
+             pre_io_read <= slb_access_valid && mem_a[17:16]==2'b11 && !mem_wr;
+             pre_addr <= mem_a;
         // if (IF_has_instr) begin
         //         $display("IF: %h %h %h %h %h %h %h %h %h",IF_npc,IF_instr,issue_toSLB,V1,V2,Q1,Q2,issue_immediate,ROB_tail);
         // end

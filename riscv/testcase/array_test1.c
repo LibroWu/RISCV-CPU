@@ -9,7 +9,7 @@ int main()
     for (i = 0; i < 4; i++)
 	{
 		a[i] = 0;
-		b[i] = i+1;
+		b[i] = inl();
 	}
 	for (i = 0; i < 4; i++)
 	{
