@@ -16,7 +16,7 @@ int main() {
 	int d;
 	int e;
 	int f;
-	N=6;
+	N=inl();
 	for ( a=1; a<=N; a++ )
 	for ( b=1; b<=N; b++ )
 	for ( c=1; c<=N; c++ )	
